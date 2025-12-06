@@ -27,8 +27,9 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = new Stripe(stripeKey, {
-      // Stick to a stable version; cast to appease latest Stripe typings
-      apiVersion: '2023-10-16' as any,
+      // Stick to a stable version; suppress newer Stripe type union that expects the latest tag
+      // @ts-expect-error: we intentionally pin to a stable Stripe API version
+      apiVersion: '2023-10-16',
     });
     
     const { userId, email } = await request.json();
