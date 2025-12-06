@@ -1,21 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20',
-});
+// Force Node runtime so server-side secrets load from .env.local
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    console.log('[create-checkout-session] Request received');
+    console.log('[create-checkout-session] STRIPE_SECRET_KEY exists:', !!stripeKey);
+    console.log('[create-checkout-session] STRIPE env keys:', Object.keys(process.env).filter((k) => k.toLowerCase().includes('stripe')));
+    if (stripeKey) {
+      console.log('[create-checkout-session] STRIPE_SECRET_KEY prefix:', stripeKey.slice(0, 8));
+    }
+    
+    if (!stripeKey) {
+      console.error('[create-checkout-session] STRIPE_SECRET_KEY is not set');
+      return NextResponse.json(
+        { error: 'Stripe is not configured' },
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(stripeKey, {
+      apiVersion: '2024-11-20',
+    });
+    
     const { userId, email } = await request.json();
+    console.log('[create-checkout-session] Body:', { userId, email });
 
     if (!userId || !email) {
+      console.warn('[create-checkout-session] Missing userId or email');
       return NextResponse.json(
         { error: 'Missing userId or email' },
         { status: 400 }
       );
     }
 
+    console.log('[create-checkout-session] Creating Stripe session...');
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
@@ -40,9 +62,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log('[create-checkout-session] Session created:', session.id);
     return NextResponse.json({ sessionId: session.id });
   } catch (err) {
-    console.error('Checkout session error:', err);
+    console.error('[create-checkout-session] Error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

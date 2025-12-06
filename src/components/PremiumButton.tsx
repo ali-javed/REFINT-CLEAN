@@ -34,7 +34,19 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
         }),
       });
 
-      const data = await response.json();
+      console.log('[PremiumButton] Response status:', response.status);
+      console.log('[PremiumButton] Response headers:', Object.fromEntries(response.headers));
+      
+      const responseText = await response.text();
+      console.log('[PremiumButton] Response text:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error('[PremiumButton] Failed to parse JSON:', parseErr);
+        throw new Error(`Invalid response format: ${responseText}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create checkout session');
