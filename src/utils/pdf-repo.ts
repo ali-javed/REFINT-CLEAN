@@ -104,7 +104,7 @@ export async function extractPdfSummary(fileName: string): Promise<string | null
 
 /**
  * Find matching PDF in repo for a reference
- * Only matches the exact Mad River Watershed paper
+ * Uses flexible keyword matching to find related papers
  */
 export function findMatchingPdf(reference: string): string | null {
   const pdfs = getAvailablePdfs();
@@ -113,32 +113,50 @@ export function findMatchingPdf(reference: string): string | null {
 
   const refLower = reference.toLowerCase();
   
-  // Look for the specific Mad River Watershed paper
-  const keywords = [
-    'hydrological',
-    'suspended sediment',
-    'mad river',
-    'watershed',
-    'time series clustering',
-  ];
+  // Define keyword groups for different papers
+  const paperKeywords = {
+    'mad-river': {
+      keywords: [
+        'hydrological',
+        'suspended sediment',
+        'mad river',
+        'watershed',
+        'time series clustering',
+      ],
+      requiredMatches: 2, // Reduced from 3 to be more flexible
+      filePattern: /mad river|hydrological/i,
+    },
+  };
 
-  // Check if reference contains most of these keywords
-  let matchCount = 0;
-  for (const keyword of keywords) {
-    if (refLower.includes(keyword)) {
-      matchCount++;
+  // Check all paper keyword groups
+  for (const [paperId, config] of Object.entries(paperKeywords)) {
+    let matchCount = 0;
+    for (const keyword of config.keywords) {
+      if (refLower.includes(keyword)) {
+        matchCount++;
+      }
+    }
+
+    // If enough keywords match, look for the corresponding PDF
+    if (matchCount >= config.requiredMatches) {
+      for (const pdf of pdfs) {
+        if (config.filePattern.test(pdf)) {
+          console.log(
+            `[pdf-repo] Reference matched to PDF "${pdf}" (${matchCount} keywords matched)`
+          );
+          return pdf;
+        }
+      }
     }
   }
 
-  // Must match at least 3 keywords to be considered the same paper
-  if (matchCount >= 3) {
-    // Find the PDF file that matches
-    for (const pdf of pdfs) {
-      const pdfLower = pdf.toLowerCase();
-      if (pdfLower.includes('mad river') || pdfLower.includes('hydrological')) {
-        return pdf;
-      }
-    }
+  // Fallback: if no specific match, try to match any available PDF for analysis
+  // This allows AI to analyze references even if they're not from the specific paper
+  if (pdfs.length > 0) {
+    console.log(
+      `[pdf-repo] No keyword match found. Using first available PDF for general analysis.`
+    );
+    return pdfs[0];
   }
   
   return null;

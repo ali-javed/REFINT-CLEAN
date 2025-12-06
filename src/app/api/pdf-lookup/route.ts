@@ -45,18 +45,24 @@ export async function POST(req: NextRequest) {
       analyzed: false,
     };
 
-    if (process.env.OPENAI_API_KEY && fullContext) {
-      const review = await analyzeReferenceIntegrity(
-        reference,
-        fullContext,
-        summary
-      );
-      if (review.score > 0) {
-        integrityReview = {
-          score: review.score,
-          justification: review.justification,
-          analyzed: true,
-        };
+    // Call OpenAI for analysis (always try, even if context is minimal)
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const review = await analyzeReferenceIntegrity(
+          reference,
+          fullContext || reference, // Use reference as fallback if no context
+          summary
+        );
+        if (review.score > 0) {
+          integrityReview = {
+            score: review.score,
+            justification: review.justification,
+            analyzed: true,
+          };
+        }
+      } catch (err) {
+        console.error('OpenAI analysis failed:', err);
+        // Fall back to default score
       }
     }
 
