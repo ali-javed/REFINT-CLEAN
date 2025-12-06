@@ -37,6 +37,18 @@ export default function ReferenceItem({ reference }: ReferenceItemProps) {
   const [pdfMetadata, setPdfMetadata] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Debug: Log what context we have
+  useEffect(() => {
+    if (reference.context_before || reference.context_after) {
+      console.log('[ReferenceItem] Has context:', {
+        before: reference.context_before?.substring(0, 50),
+        after: reference.context_after?.substring(0, 50),
+      });
+    } else {
+      console.log('[ReferenceItem] NO CONTEXT for:', reference.raw_reference.substring(0, 50));
+    }
+  }, [reference]);
+
   useEffect(() => {
     async function fetchPdfMetadata() {
       try {

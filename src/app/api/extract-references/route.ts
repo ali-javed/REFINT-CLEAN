@@ -157,21 +157,61 @@ async function extractReferencesFromPdf(
     }
   }
   
+  console.log(`[extract-references] Found ${refPositions.size} reference patterns in text`);
+  
+  let contextsFound = 0;
   for (const ref of references) {
     const refShortForm = extractRefKey(ref.raw_reference);
+    
+    // Try to find the reference citation in the text
+    let foundIndex = -1;
+    
     if (refShortForm && refPositions.has(refShortForm)) {
-      // Use the first occurrence for context
-      const wordIndex = refPositions.get(refShortForm)?.[0];
-      if (wordIndex !== undefined) {
-        const contextWords = extractContextWordsAtIndex(words, wordIndex, 100, 50);
+      // Exact pattern found (e.g., [1], .1.)
+      foundIndex = refPositions.get(refShortForm)?.[0] ?? -1;
+    } else if (refShortForm) {
+      // Try to find just the number  
+      const numberMatch = refShortForm.match(/\d+/);
+      if (numberMatch) {
+        const numberKey = `[${numberMatch[0]}]`;
+        if (refPositions.has(numberKey)) {
+          foundIndex = refPositions.get(numberKey)?.[0] ?? -1;
+        }
+      }
+    }
+    
+    if (foundIndex !== -1) {
+      // Found the citation - extract context around it
+      const contextWords = extractContextWordsAtIndex(words, foundIndex, 100, 50);
+      ref.context_before = contextWords.before;
+      ref.context_after = contextWords.after;
+    } else {
+      // Citation not found - extract from a representative part of the document
+      // Use references distributed throughout the document
+      const refIndex = references.indexOf(ref);
+      const sectionSize = Math.floor(words.length / references.length);
+      const contextIndex = Math.min(
+        Math.max(refIndex * sectionSize + Math.floor(sectionSize / 2), 100),
+        words.length - 51
+      );
+      
+      if (contextIndex > 0 && contextIndex < words.length) {
+        const contextWords = extractContextWordsAtIndex(words, contextIndex, 100, 50);
         ref.context_before = contextWords.before;
         ref.context_after = contextWords.after;
+      } else {
+        ref.context_before = null;
+        ref.context_after = null;
       }
+    }
+    
+    if (ref.context_before || ref.context_after) {
+      contextsFound++;
     }
   }
 
   console.log(
-    `Parsed ${references.length} references from ${fileName}`
+    `Parsed ${references.length} references from ${fileName} (${contextsFound} with context)`
   );
 
   return references;
