@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/utils/supabase/server';
+import ReferencesList from '@/components/ReferencesList';
 
 // We keep typing loose here because Next is giving params as a Promise
 export default async function ReferencesPage(props: any) {
@@ -29,7 +30,7 @@ export default async function ReferencesPage(props: any) {
 
   const { data, error } = await supabase
     .from('references_list')
-    .select('id, raw_reference, created_at')
+    .select('id, raw_reference, context_before, context_after, created_at')
     .eq('document_id', documentId)
     .order('created_at', { ascending: true });
 
@@ -59,16 +60,7 @@ export default async function ReferencesPage(props: any) {
             No references found for this document.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {refs.map((r: any) => (
-              <li
-                key={r.id}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm"
-              >
-                {r.raw_reference}
-              </li>
-            ))}
-          </ul>
+          <ReferencesList references={refs} />
         )}
       </div>
     </main>

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function UploadForm() {
+  const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -33,24 +35,20 @@ export default function UploadForm() {
 
       const json = await res.json();
 
-    if (!res.ok) {
+      if (!res.ok) {
         const msgParts = [];
         if (json.error) msgParts.push(json.error);
         if (json.message) msgParts.push(json.message);
         setStatus('Error: ' + (msgParts.join(' – ') || 'Something went wrong.'));
         return;
-}
+      }
 
-      const msgParts = [];
-
-        if (json.documentId) {
-          setStatus(
-            `Saved ${json.count} references. ` +
-            `View them at: http://localhost:3000/references/${json.documentId}`
-          );
-        } else {
-          setStatus(json.message || "Done.");
-        }
+      // Redirect directly to references page
+      if (json.documentId) {
+        router.push(`/references/${json.documentId}`);
+      } else {
+        setStatus('Error: No document ID returned');
+      }
 
 
 
