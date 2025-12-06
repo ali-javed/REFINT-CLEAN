@@ -16,7 +16,8 @@ async function extractReferencesFromPdf(
   // Use unpdf for text extraction (works in Node.js without browser APIs)
   const uint8Array = new Uint8Array(buffer);
   const result = await extractText(uint8Array);
-  const rawText = result.text || '';
+  // unpdf returns {totalPages: number, text: string[]} - join pages into single string
+  const rawText = Array.isArray(result?.text) ? result.text.join('\n') : (typeof result === 'string' ? result : '');
 
   if (!rawText.trim()) {
     throw new Error('PDF text is empty or could not be parsed');

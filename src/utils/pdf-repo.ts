@@ -39,7 +39,8 @@ export async function extractPdfSummary(fileName: string): Promise<string | null
     const buffer = fs.readFileSync(filePath);
     const uint8Array = new Uint8Array(buffer);
     const result = await extractText(uint8Array);
-    const rawText = result.text || '';
+    // unpdf returns {totalPages: number, text: string[]} - join pages into single string
+    const rawText = Array.isArray(result?.text) ? result.text.join('\n') : (typeof result === 'string' ? result : '');
 
     if (!rawText.trim()) {
       return null;
