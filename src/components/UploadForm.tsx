@@ -33,13 +33,22 @@ export default function UploadForm() {
         body: formData,
       });
 
-      const json = await res.json();
+      let json;
+      try {
+        json = await res.json();
+      } catch (parseErr) {
+        console.error('Failed to parse response:', parseErr);
+        setStatus('Server error: Invalid response format');
+        return;
+      }
 
       if (!res.ok) {
         const msgParts = [];
         if (json.error) msgParts.push(json.error);
         if (json.message) msgParts.push(json.message);
-        setStatus('Error: ' + (msgParts.join(' – ') || 'Something went wrong.'));
+        const errorMsg = msgParts.join(' – ') || `HTTP ${res.status}`;
+        setStatus('Error: ' + errorMsg);
+        console.error('API Error:', json);
         return;
       }
 
@@ -53,8 +62,9 @@ export default function UploadForm() {
 
 
     } catch (err) {
-      console.error(err);
-      setStatus('Network error. Please try again.');
+      console.error('Upload error:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      setStatus(`Network error: ${errorMsg}`);
     } finally {
       setIsLoading(false);
     }

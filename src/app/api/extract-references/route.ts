@@ -221,12 +221,27 @@ function extractContextWords(
 
 export async function POST(req: NextRequest) {
   try {
+    // Validate environment variables
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing. Contact administrator.' },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
     if (!file) {
       return NextResponse.json(
         { error: 'No file uploaded' },
+        { status: 400 }
+      );
+    }
+
+    if (!file.type.includes('pdf')) {
+      return NextResponse.json(
+        { error: 'File must be a PDF' },
         { status: 400 }
       );
     }
@@ -254,8 +269,9 @@ export async function POST(req: NextRequest) {
 
     if (insertError) {
       console.error('Supabase insert error:', insertError);
-      throw new Error(
-        `Failed to save references – ${insertError.message}`
+      return NextResponse.json(
+        { error: `Database error: ${insertError.message}` },
+        { status: 500 }
       );
     }
 
@@ -265,10 +281,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error('Error in /api/extract-references:', err);
-    const message =
-      err instanceof Error ? err.message : 'Unknown server error';
+    const message = err instanceof Error ? err.message : 'Unknown error';
     return NextResponse.json(
-      { error: `Server error – ${message}` },
+      { error: message },
       { status: 500 }
     );
   }
