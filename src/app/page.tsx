@@ -36,7 +36,10 @@ export default function HomePage() {
             <p className="text-xs text-slate-600">Logged in as <span className="font-semibold">{session.user.email}</span></p>
             <button
               onClick={async () => {
-                await supabase?.auth.signOut();
+                const { error } = await supabase?.auth.signOut();
+                if (!error) {
+                  setSession(null);
+                }
               }}
               className="text-xs font-semibold text-slate-700 hover:text-slate-900 underline"
             >
