@@ -77,9 +77,23 @@ export default function InlineSignUp({ onAuthSuccess }: InlineSignUpProps) {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : (isSignIn ? 'Sign in failed' : 'Signup failed');
+      let message = err instanceof Error ? err.message : (isSignIn ? 'Sign in failed' : 'Signup failed');
       console.error('[InlineSignUp] Auth error:', err);
-      setStatus(message.includes('Failed to fetch') ? 'Network error: could not reach Supabase' : message);
+      
+      // Improve error messages
+      if (message.includes('Failed to fetch')) {
+        message = 'Network error: could not reach Supabase';
+      } else if (message.includes('Invalid login credentials')) {
+        message = 'Incorrect email or password';
+      } else if (message.includes('User already registered')) {
+        message = 'Email is already registered. Please sign in instead.';
+      } else if (message.includes('Password should be') || message.includes('at least')) {
+        message = 'Password must be at least 6 characters';
+      } else if (message.includes('Invalid email')) {
+        message = 'Invalid email address';
+      }
+      
+      setStatus(message);
     } finally {
       setLoading(false);
     }
