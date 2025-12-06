@@ -38,7 +38,8 @@ export async function extractPdfSummary(fileName: string): Promise<string | null
     // Extract PDF text
     const buffer = fs.readFileSync(filePath);
     const uint8Array = new Uint8Array(buffer);
-    const { text: rawText } = await extractText(uint8Array);
+    const result = await extractText(uint8Array);
+    const rawText = result.text || '';
 
     if (!rawText.trim()) {
       return null;
