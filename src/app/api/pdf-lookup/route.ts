@@ -38,19 +38,18 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join(' [...citation...] ');
 
-    // Analyze reference integrity using OpenAI
+    // Analyze reference integrity using OpenAI (only for found papers)
     let integrityReview = {
-      score: 10, // Default to 10 if no OpenAI analysis
+      score: 10,
       justification: 'Paper found in repository',
       analyzed: false,
     };
 
-    // Call OpenAI for analysis (always try, even if context is minimal)
     if (process.env.OPENAI_API_KEY) {
       try {
         const review = await analyzeReferenceIntegrity(
           reference,
-          fullContext || reference, // Use reference as fallback if no context
+          fullContext || reference,
           summary
         );
         if (review.score > 0) {

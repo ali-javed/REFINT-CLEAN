@@ -104,7 +104,7 @@ export async function extractPdfSummary(fileName: string): Promise<string | null
 
 /**
  * Find matching PDF in repo for a reference
- * Uses flexible keyword matching to find related papers
+ * Only returns a match if reference keywords actually match the paper
  */
 export function findMatchingPdf(reference: string): string | null {
   const pdfs = getAvailablePdfs();
@@ -123,7 +123,7 @@ export function findMatchingPdf(reference: string): string | null {
         'watershed',
         'time series clustering',
       ],
-      requiredMatches: 2, // Reduced from 3 to be more flexible
+      requiredMatches: 2, // Must match at least 2 keywords
       filePattern: /mad river|hydrological/i,
     },
   };
@@ -150,14 +150,9 @@ export function findMatchingPdf(reference: string): string | null {
     }
   }
 
-  // Fallback: if no specific match, try to match any available PDF for analysis
-  // This allows AI to analyze references even if they're not from the specific paper
-  if (pdfs.length > 0) {
-    console.log(
-      `[pdf-repo] No keyword match found. Using first available PDF for general analysis.`
-    );
-    return pdfs[0];
-  }
-  
+  // No match found - return null so "Full paper not found" is shown
+  console.log(
+    `[pdf-repo] No keyword match found for reference. Showing "not found".`
+  );
   return null;
 }
