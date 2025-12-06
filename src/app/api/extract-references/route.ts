@@ -263,6 +263,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log('[extract-references] Processing PDF upload...');
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
@@ -284,7 +285,11 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     // 1) Extract references with context from the PDF
+    console.log(`[extract-references] Extracting references from ${file.name}...`);
+    const startTime = Date.now();
     const referencesWithContext = await extractReferencesFromPdf(buffer, file.name);
+    const duration = Date.now() - startTime;
+    console.log(`[extract-references] Extraction took ${duration}ms for ${referencesWithContext.length} references`);
 
     // 2) Save them to Supabase
     const supabase = getSupabaseClient();
