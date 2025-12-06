@@ -322,15 +322,17 @@ function extractContextWords(
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('[extract-references] Processing PDF upload...');
+    
     // Validate environment variables
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      console.error('[extract-references] Missing Supabase configuration');
       return NextResponse.json(
         { error: 'Supabase configuration missing. Contact administrator.' },
         { status: 500 }
       );
     }
 
-    console.log('[extract-references] Processing PDF upload...');
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
@@ -348,13 +350,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log(`[extract-references] File received: ${file.name}, size: ${file.size} bytes`);
+    
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    
+    console.log(`[extract-references] Buffer created: ${buffer.length} bytes`);
 
     // 1) Extract references with context from the PDF
     console.log(`[extract-references] Extracting references from ${file.name}...`);
     const startTime = Date.now();
-    const referencesWithContext = await extractReferencesFromPdf(buffer, file.name);
+    
+    let referencesWithContext;
+    try {
+      referencesWithContext = await extractReferencesFromPdf(buffer, file.name);
+    } catch (pdfError) {
+      console.error('[extract-references] PDF extraction failed:', pdfError);
+      throw new Error(`PDF extraction failed: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`);
+    }
+    
     const duration = Date.now() - startTime;
     console.log(`[extract-references] Extraction took ${duration}ms for ${referencesWithContext.length} references`);
 
@@ -381,15 +395,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    console.log(`[extract-references] Successfully processed ${referencesWithContext.length} references`);
+    
     return NextResponse.json({
       documentId,
       referencesCount: referencesWithContext.length,
-    });
+    }, { status: 200 });
   } catch (err) {
-    console.error('Error in /api/extract-references:', err);
-    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[extract-references] Error:', err);
+    
+    // Ensure we always return a valid JSON response
+    const message = err instanceof Error ? err.message : 'Unknown error occurred';
+    const stack = err instanceof Error ? err.stack : undefined;
+    
+    console.error('[extract-references] Error details:', { message, stack });
+    
     return NextResponse.json(
-      { error: message },
+      { 
+        error: message,
+        details: process.env.NODE_ENV === 'development' ? stack : undefined 
+      },
       { status: 500 }
     );
   }
