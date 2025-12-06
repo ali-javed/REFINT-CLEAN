@@ -78,7 +78,6 @@ async function extractReferencesFromPdf(
   const lines = refsBlock.split(/\n+/);
   const references: ReferenceWithContext[] = [];
   let current = '';
-  let currentLineIndex = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -103,7 +102,6 @@ async function extractReferencesFromPdf(
         context_after: null,
       });
       current = trimmed;
-      currentLineIndex = i;
     } else {
       current = current ? `${current} ${trimmed}` : trimmed;
     }
@@ -283,33 +281,6 @@ function extractContextWordsAtIndex(
     before: beforeWords.length > 0 ? beforeWords.join(' ') : null,
     after: afterWords.length > 0 ? afterWords.join(' ') : null,
   };
-}
-
-/**
- * Extract previous and next N words containing the reference key (DEPRECATED - use extractContextWordsAtIndex)
- */
-function extractContextWords(
-  words: string[],
-  refKey: string,
-  beforeCount: number,
-  afterCount: number
-): { before: string | null; after: string | null } {
-  let foundIndex = -1;
-
-  // Find the word containing the reference key (case-insensitive)
-  const refKeyLower = refKey.toLowerCase();
-  for (let i = 0; i < words.length; i++) {
-    if (words[i].toLowerCase().includes(refKeyLower)) {
-      foundIndex = i;
-      break;
-    }
-  }
-
-  if (foundIndex === -1) {
-    return { before: null, after: null };
-  }
-
-  return extractContextWordsAtIndex(words, foundIndex, beforeCount, afterCount);
 }
 
 export async function POST(req: NextRequest) {

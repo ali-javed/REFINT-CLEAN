@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findMatchingPdf, extractPdfSummary } from '@/utils/pdf-repo';
 import { analyzeReferenceIntegrity } from '@/utils/integrity-analyzer';
+import { searchArxiv } from '@/utils/arxiv';
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,23 +16,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find matching PDF in repo
+    // Find matching PDF in repo first
     const matchingPdfFileName = findMatchingPdf(reference);
 
-    if (!matchingPdfFileName) {
-      return NextResponse.json({
-        found: false,
-        message: 'PDF not found in repository',
-      });
+    let source: 'repo' | 'arxiv' | null = null;
+    let summary: string | null = null;
+    let fileName: string | null = null;
+    let fileExists: boolean | null = null;
+    let arxiv = null as
+      | null
+      | {
+          title?: string;
+          link?: string;
+          pdfUrl?: string;
+          id?: string;
+          published?: string;
+        };
+
+    if (matchingPdfFileName) {
+      source = 'repo';
+      fileName = matchingPdfFileName;
+      summary = await extractPdfSummary(matchingPdfFileName);
+      const papersPath = path.join(process.cwd(), 'public', 'papers', matchingPdfFileName);
+      fileExists = fs.existsSync(papersPath);
+    } else {
+      // Fallback to arXiv search
+      const arxivResult = await searchArxiv(reference);
+      if (arxivResult) {
+        source = 'arxiv';
+        summary = arxivResult.summary || null;
+        arxiv = {
+          title: arxivResult.title,
+          link: arxivResult.link,
+          pdfUrl: arxivResult.pdfUrl,
+          id: arxivResult.id,
+          published: arxivResult.published,
+        };
+      }
     }
 
-    // Extract summary from the PDF
-    const summary = await extractPdfSummary(matchingPdfFileName);
-
-    if (!summary) {
+    if (!source || !summary) {
       return NextResponse.json({
         found: false,
-        message: 'Could not extract summary from PDF',
+        message: 'PDF not found in repository or arXiv',
       });
     }
 
@@ -38,10 +67,10 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join(' [...citation...] ');
 
-    // Analyze reference integrity using OpenAI (only for found papers)
+    // Analyze reference integrity using OpenAI (only when summary available)
     let integrityReview = {
       score: 10,
-      justification: 'Paper found in repository',
+      justification: source === 'repo' ? 'Paper found in repository' : 'Paper found on arXiv',
       analyzed: false,
     };
 
@@ -67,9 +96,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       found: true,
-      fileName: matchingPdfFileName,
+      source,
+      fileName,
       summary,
       integrity: integrityReview,
+      arxiv,
+      fileExists,
     });
   } catch (err) {
     console.error('Error in /api/pdf-lookup:', err);

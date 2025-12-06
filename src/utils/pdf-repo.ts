@@ -122,7 +122,7 @@ export function findMatchingPdf(reference: string): string | null {
   };
 
   // Check all paper keyword groups
-  for (const [paperId, config] of Object.entries(paperKeywords)) {
+  for (const [, config] of Object.entries(paperKeywords)) {
     let matchCount = 0;
     for (const keyword of config.keywords) {
       if (refLower.includes(keyword)) {

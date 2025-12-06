@@ -1,8 +1,11 @@
 import { getSupabaseClient } from '@/utils/supabase/server';
 import ReferencesList from '@/components/ReferencesList';
 
-// We keep typing loose here because Next is giving params as a Promise
-export default async function ReferencesPage(props: any) {
+type ReferencesPageProps = {
+  params: Promise<{ documentId?: string }>;
+};
+
+export default async function ReferencesPage(props: ReferencesPageProps) {
   // In this Next.js version, props.params is a Promise
   const resolvedParams = await props.params;
   const documentId: string | undefined = resolvedParams?.documentId;
