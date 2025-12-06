@@ -1,16 +1,7 @@
 // src/app/api/extract-references/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { PDFParse } from 'pdf-parse';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { getSupabaseClient } from '@/utils/supabase/server';
-import path from 'path';
-
-// Configure PDF worker - required for pdf-parse to work in Node.js
-const workerPath = path.join(
-  process.cwd(),
-  'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'
-);
-pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
 
 interface ReferenceWithContext {
   raw_reference: string;

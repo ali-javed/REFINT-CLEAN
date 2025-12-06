@@ -1,14 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import { PDFParse } from 'pdf-parse';
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
-
-// Configure PDF worker
-const workerPath = path.join(
-  process.cwd(),
-  'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'
-);
-pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
 
 /**
  * Get list of available PDFs in the papers folder
