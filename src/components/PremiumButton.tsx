@@ -61,7 +61,12 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
       }
 
       // Fallback to legacy redirectToCheckout if available
-      const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+      const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      if (!publishableKey) {
+        throw new Error('Stripe publishable key is missing');
+      }
+
+      const stripe = await loadStripe(publishableKey);
       if (!stripe) {
         throw new Error('Failed to load Stripe');
       }
