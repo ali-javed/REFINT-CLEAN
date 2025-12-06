@@ -72,6 +72,7 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
       }
 
       console.log('[PremiumButton] Redirecting via Stripe.js fallback...');
+      // @ts-expect-error: Some Stripe typings lag behind; redirectToCheckout exists in runtime
       const { error: stripeError } = await stripe.redirectToCheckout({
         sessionId: data.sessionId,
       });
