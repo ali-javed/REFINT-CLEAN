@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import dotenv from 'dotenv';
+
+// Ensure env vars load even if Next.js fails to hydrate .env.local in dev
+dotenv.config({ path: '.env.local' });
 
 // Force Node runtime so server-side secrets load from .env.local
 export const runtime = 'nodejs';
