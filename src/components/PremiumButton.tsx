@@ -52,13 +52,21 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
-      console.log('[PremiumButton] Checkout session created:', data.sessionId);
+      console.log('[PremiumButton] Checkout session created:', data.sessionId, 'url:', data.url);
+
+      // Prefer direct URL redirect (Stripe.js redirectToCheckout deprecated)
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      // Fallback to legacy redirectToCheckout if available
       const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
       if (!stripe) {
         throw new Error('Failed to load Stripe');
       }
 
-      console.log('[PremiumButton] Redirecting to Stripe checkout...');
+      console.log('[PremiumButton] Redirecting via Stripe.js fallback...');
       const { error: stripeError } = await stripe.redirectToCheckout({
         sessionId: data.sessionId,
       });

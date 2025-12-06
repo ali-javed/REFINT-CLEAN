@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    console.log('[create-checkout-session] Session created:', session.id);
-    return NextResponse.json({ sessionId: session.id });
+    console.log('[create-checkout-session] Session created:', session.id, 'url:', session.url);
+    return NextResponse.json({ sessionId: session.id, url: session.url });
   } catch (err) {
     console.error('[create-checkout-session] Error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
