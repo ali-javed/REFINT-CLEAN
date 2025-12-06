@@ -12,6 +12,8 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  console.log('[PremiumButton] Session:', { exists: !!session, email: session?.user.email });
+
   const handlePremiumClick = async () => {
     if (!session) {
       setError('Please sign in first');
@@ -22,6 +24,7 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
     setError(null);
 
     try {
+      console.log('[PremiumButton] Creating checkout session...');
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,11 +40,13 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
+      console.log('[PremiumButton] Checkout session created:', data.sessionId);
       const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
       if (!stripe) {
         throw new Error('Failed to load Stripe');
       }
 
+      console.log('[PremiumButton] Redirecting to Stripe checkout...');
       const { error: stripeError } = await stripe.redirectToCheckout({
         sessionId: data.sessionId,
       });
@@ -51,7 +56,7 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An error occurred';
-      console.error('Premium checkout error:', err);
+      console.error('[PremiumButton] Premium checkout error:', err);
       setError(message);
     } finally {
       setLoading(false);
@@ -59,6 +64,7 @@ export default function PremiumButton({ session }: PremiumButtonProps) {
   };
 
   if (!session) {
+    console.log('[PremiumButton] No session, not rendering');
     return null;
   }
 

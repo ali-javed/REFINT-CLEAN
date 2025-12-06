@@ -19,9 +19,11 @@ export default function HomePage() {
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
+      console.log('[HomePage] Session loaded:', { exists: !!data.session, email: data.session?.user.email });
       setSession(data.session ?? null);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      console.log('[HomePage] Auth state changed:', { event: _event, exists: !!nextSession });
       setSession(nextSession);
     });
     return () => {
