@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { loadStripe } from '@stripe/js';
+import { loadStripe } from '@stripe/stripe-js';
 import type { Session } from '@supabase/supabase-js';
 
 interface PremiumButtonProps {
