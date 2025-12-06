@@ -131,21 +131,42 @@ async function extractReferencesFromPdf(
   }
 
   // Now extract context (100 words before and 50 words after) from full document
+  // Optimize: build a word index first to avoid O(n*m) complexity
   const fullText = rawText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F]/g, ' ');
   const words = fullText.match(/\S+/g) || [];
   
+  // Pre-build a map of reference keys to their positions for faster lookup
+  const refPositions = new Map<string, number[]>();
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    // Check for [n] pattern
+    if (/^\[\d+\]/.test(word)) {
+      const key = word.match(/^\[\d+\]/)?.[0];
+      if (key) {
+        if (!refPositions.has(key)) refPositions.set(key, []);
+        refPositions.get(key)!.push(i);
+      }
+    }
+    // Check for .n. pattern
+    if (/^\.\d+\./.test(word)) {
+      const key = word.match(/^\.\d+\./)?.[0];
+      if (key) {
+        if (!refPositions.has(key)) refPositions.set(key, []);
+        refPositions.get(key)!.push(i);
+      }
+    }
+  }
+  
   for (const ref of references) {
-    // Find words that cite this reference
     const refShortForm = extractRefKey(ref.raw_reference);
-    if (refShortForm) {
-      const contextWords = extractContextWords(
-        words,
-        refShortForm,
-        100,
-        50
-      );
-      ref.context_before = contextWords.before;
-      ref.context_after = contextWords.after;
+    if (refShortForm && refPositions.has(refShortForm)) {
+      // Use the first occurrence for context
+      const wordIndex = refPositions.get(refShortForm)?.[0];
+      if (wordIndex !== undefined) {
+        const contextWords = extractContextWordsAtIndex(words, wordIndex, 100, 50);
+        ref.context_before = contextWords.before;
+        ref.context_after = contextWords.after;
+      }
     }
   }
 
@@ -182,7 +203,31 @@ function extractRefKey(reference: string): string | null {
 }
 
 /**
- * Extract previous and next N words containing the reference key
+ * Extract previous and next N words from a specific index in the word array
+ * Optimized: directly uses the index instead of searching through all words
+ */
+function extractContextWordsAtIndex(
+  words: string[],
+  wordIndex: number,
+  beforeCount: number,
+  afterCount: number
+): { before: string | null; after: string | null } {
+  // Get previous N words
+  const beforeStart = Math.max(0, wordIndex - beforeCount);
+  const beforeWords = words.slice(beforeStart, wordIndex);
+
+  // Get next N words
+  const afterEnd = Math.min(words.length, wordIndex + afterCount + 1);
+  const afterWords = words.slice(wordIndex + 1, afterEnd);
+
+  return {
+    before: beforeWords.length > 0 ? beforeWords.join(' ') : null,
+    after: afterWords.length > 0 ? afterWords.join(' ') : null,
+  };
+}
+
+/**
+ * Extract previous and next N words containing the reference key (DEPRECATED - use extractContextWordsAtIndex)
  */
 function extractContextWords(
   words: string[],
@@ -205,18 +250,7 @@ function extractContextWords(
     return { before: null, after: null };
   }
 
-  // Get previous N words
-  const beforeStart = Math.max(0, foundIndex - beforeCount);
-  const beforeWords = words.slice(beforeStart, foundIndex);
-
-  // Get next N words
-  const afterEnd = Math.min(words.length, foundIndex + afterCount + 1);
-  const afterWords = words.slice(foundIndex + 1, afterEnd);
-
-  return {
-    before: beforeWords.length > 0 ? beforeWords.join(' ') : null,
-    after: afterWords.length > 0 ? afterWords.join(' ') : null,
-  };
+  return extractContextWordsAtIndex(words, foundIndex, beforeCount, afterCount);
 }
 
 export async function POST(req: NextRequest) {

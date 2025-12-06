@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/extract-references/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/pdf-lookup/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
