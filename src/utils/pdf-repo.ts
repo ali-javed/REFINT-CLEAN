@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { PDFParse } from 'pdf-parse';
+import { extractText } from 'unpdf';
 
 /**
  * Get list of available PDFs in the papers folder
@@ -37,9 +37,7 @@ export async function extractPdfSummary(fileName: string): Promise<string | null
 
     // Extract PDF text
     const buffer = fs.readFileSync(filePath);
-    const pdfParser = new PDFParse({ data: buffer });
-    const textData = await pdfParser.getText();
-    const rawText = textData.text || '';
+    const { text: rawText } = await extractText(buffer);
 
     if (!rawText.trim()) {
       return null;

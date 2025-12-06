@@ -1,6 +1,6 @@
 // src/app/api/extract-references/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFParse } from 'pdf-parse';
+import { extractText } from 'unpdf';
 import { getSupabaseClient } from '@/utils/supabase/server';
 
 interface ReferenceWithContext {
@@ -13,10 +13,8 @@ async function extractReferencesFromPdf(
   buffer: Buffer,
   fileName: string
 ): Promise<ReferenceWithContext[]> {
-  // PDFParse is a class - instantiate it with options
-  const pdfParser = new PDFParse({ data: buffer });
-  const textData = await pdfParser.getText();
-  const rawText = textData.text || '';
+  // Use unpdf for text extraction (works in Node.js without browser APIs)
+  const { text: rawText } = await extractText(buffer);
 
   if (!rawText.trim()) {
     throw new Error('PDF text is empty or could not be parsed');
