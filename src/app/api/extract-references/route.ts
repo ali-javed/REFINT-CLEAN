@@ -14,7 +14,8 @@ async function extractReferencesFromPdf(
   fileName: string
 ): Promise<ReferenceWithContext[]> {
   // Use unpdf for text extraction (works in Node.js without browser APIs)
-  const { text: rawText } = await extractText(buffer);
+  const uint8Array = new Uint8Array(buffer);
+  const { text: rawText } = await extractText(uint8Array);
 
   if (!rawText.trim()) {
     throw new Error('PDF text is empty or could not be parsed');
