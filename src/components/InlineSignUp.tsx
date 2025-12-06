@@ -19,9 +19,11 @@ export default function InlineSignUp({ onAuthSuccess }: InlineSignUpProps) {
   useEffect(() => {
     try {
       const client = getBrowserSupabaseClient();
+      console.log('[InlineSignUp] Supabase client initialized');
       setSupabase(client);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Supabase not configured';
+      console.error('[InlineSignUp] Supabase init error:', message);
       setStatus(message);
     }
   }, []);
@@ -30,8 +32,20 @@ export default function InlineSignUp({ onAuthSuccess }: InlineSignUpProps) {
     e.preventDefault();
     setStatus(null);
     if (!supabase) {
-      setStatus('Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL/ANON_KEY.');
+      const msg = 'Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL/ANON_KEY.';
+      console.error('[InlineSignUp]', msg);
+      setStatus(msg);
       return;
+    }
+    // Ensure session is hydrated before proceeding
+    try {
+      const { error } = await supabase.auth.getSession();
+      if (error) {
+        console.warn('[InlineSignUp] Session hydration warning:', error);
+        // Continue anyway—session hydration warnings are not fatal
+      }
+    } catch (sessionErr) {
+      console.warn('[InlineSignUp] Could not hydrate session:', sessionErr);
     }
     if (!email || !password) {
       setStatus('Enter email and password to continue.');
@@ -41,9 +55,14 @@ export default function InlineSignUp({ onAuthSuccess }: InlineSignUpProps) {
     try {
       if (isSignIn) {
         // Sign in
+        console.log('[InlineSignUp] Signing in with:', email);
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          console.error('[InlineSignUp] Sign in error:', error);
+          throw error;
+        }
         if (data.session) {
+          console.log('[InlineSignUp] Sign in successful');
           setStatus('Signed in successfully!');
           onAuthSuccess?.(data.session);
         }
@@ -83,6 +102,8 @@ export default function InlineSignUp({ onAuthSuccess }: InlineSignUpProps) {
       // Improve error messages
       if (message.includes('Failed to fetch')) {
         message = 'Network error: could not reach Supabase';
+      } else if (message.includes('load failed')) {
+        message = 'Failed to load authentication. Please try again.';
       } else if (message.includes('Invalid login credentials')) {
         message = 'Incorrect email or password';
       } else if (message.includes('User already registered')) {

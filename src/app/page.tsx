@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import UploadForm from '@/components/UploadForm';
+import PremiumButton from '@/components/PremiumButton';
 import { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 
 export default function HomePage() {
@@ -32,20 +33,35 @@ export default function HomePage() {
     <main className="min-h-screen bg-white text-slate-900 flex flex-col items-center justify-center">
       <div className="w-full max-w-xl px-4">
         {session && (
-          <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 flex items-center justify-between">
-            <p className="text-xs text-slate-600">Logged in as <span className="font-semibold">{session.user.email}</span></p>
-            <button
-              onClick={async () => {
-                const { error } = await supabase?.auth.signOut();
-                if (!error) {
-                  setSession(null);
-                }
-              }}
-              className="text-xs font-semibold text-slate-700 hover:text-slate-900 underline"
-            >
-              Sign out
-            </button>
-          </div>
+          <>
+            <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 flex items-center justify-between">
+              <p className="text-xs text-slate-600">Logged in as <span className="font-semibold">{session.user.email}</span></p>
+              <button
+                onClick={async () => {
+                  if (!supabase) {
+                    console.error('Supabase client not initialized');
+                    return;
+                  }
+                  try {
+                    // Ensure session is current before signout
+                    const { data: currentSession } = await supabase.auth.getSession();
+                    console.log('[HomePage] Current session before signout:', { exists: !!currentSession.session });
+                    
+                    const { error } = await supabase.auth.signOut();
+                    if (error) throw error;
+                    setSession(null);
+                    console.log('[HomePage] Sign out successful');
+                  } catch (err) {
+                    console.error('Sign out error:', err);
+                  }
+                }}
+                className="text-xs font-semibold text-slate-700 hover:text-slate-900 underline"
+              >
+                Sign out
+              </button>
+            </div>
+            <PremiumButton session={session} />
+          </>
         )}
         <div className="text-center mb-8">
           <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight mb-3">
