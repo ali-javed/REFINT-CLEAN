@@ -11,16 +11,16 @@ const workerPath = path.join(
 pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
 
 /**
- * Get list of available PDFs in the repo folder
+ * Get list of available PDFs in the papers folder
  */
 export function getAvailablePdfs(): string[] {
-  const repoPath = path.join(process.cwd(), '..', 'repo');
+  const papersPath = path.join(process.cwd(), 'public', 'papers');
   
   try {
-    const files = fs.readdirSync(repoPath);
+    const files = fs.readdirSync(papersPath);
     return files.filter((f) => f.toLowerCase().endsWith('.pdf'));
   } catch (err) {
-    console.error('Error reading repo folder:', err);
+    console.error('Error reading papers folder:', err);
     return [];
   }
 }
@@ -30,11 +30,11 @@ export function getAvailablePdfs(): string[] {
  */
 export async function extractPdfSummary(fileName: string): Promise<string | null> {
   try {
-    const repoPath = path.join(process.cwd(), '..', 'repo');
-    const filePath = path.join(repoPath, fileName);
+    const papersPath = path.join(process.cwd(), 'public', 'papers');
+    const filePath = path.join(papersPath, fileName);
     
-    // Security check: ensure file is within repo folder
-    if (!path.resolve(filePath).startsWith(path.resolve(repoPath))) {
+    // Security check: ensure file is within papers folder
+    if (!path.resolve(filePath).startsWith(path.resolve(papersPath))) {
       return null;
     }
 

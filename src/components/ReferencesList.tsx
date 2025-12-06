@@ -30,7 +30,11 @@ export default function ReferencesList({
             const res = await fetch('/api/pdf-lookup', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ reference: ref.raw_reference }),
+              body: JSON.stringify({
+                reference: ref.raw_reference,
+                context_before: ref.context_before,
+                context_after: ref.context_after,
+              }),
             });
             const data = await res.json();
             return {
