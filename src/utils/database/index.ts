@@ -12,12 +12,6 @@ export { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 
 // Database operation exports
 export {
-  // Anonymous session operations
-  createAnonSession,
-  getAnonSessionByToken,
-  getOrCreateAnonSession,
-  incrementAnonSessionUploads,
-
   // Document operations
   createDocument,
   updateDocumentStatus,
@@ -29,14 +23,4 @@ export {
   updateDocumentReferenceIntegrity,
   batchUpdateReferenceIntegrity,
   getDocumentReferences,
-
-  // Feedback operations
-  createAuditFeedback,
-
-  // Processing job operations
-  createProcessingJob,
-  updateProcessingJobStatus,
-
-  // Analytics operations
-  logUserAction,
 } from '@/utils/database/operations';
