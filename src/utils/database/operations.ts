@@ -336,12 +336,36 @@ export async function getDocumentWithReferences(documentId: string) {
 }
 
 /**
- * Calculate and update overall integrity score for a document
- * Simplified: Skip since integrity_score column doesn't exist
+ * Calculate the average context integrity score for all references in a document
  */
 export async function calculateDocumentIntegrityScore(documentId: string) {
-  // Skip - integrity_score column doesn't exist in simplified schema
-  return null;
+  const supabase = getSupabaseServiceClient();
+
+  const { data, error } = await supabase
+    .from('document_references')
+    .select('context_integrity_score')
+    .eq('document_id', documentId);
+
+  if (error) {
+    console.error('Failed to fetch reference scores:', error);
+    return null;
+  }
+
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  // Filter out null scores and calculate average
+  const scores = data
+    .map((ref: any) => ref.context_integrity_score)
+    .filter((score: number | null) => score !== null && score !== undefined);
+
+  if (scores.length === 0) {
+    return null;
+  }
+
+  const average = scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length;
+  return Math.round(average);
 }
 
 /**

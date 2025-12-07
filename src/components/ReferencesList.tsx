@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import ReferenceItem from '@/components/ReferenceItem';
 import InlineSignUp from '@/components/InlineSignUp';
-import PremiumButton from '@/components/PremiumButton';
 import { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 
 interface Reference {
@@ -169,75 +168,10 @@ export default function ReferencesList({
   }
 
   return (
-    <div className="space-y-4">
-      {session && (
-        <PremiumButton session={session} />
-      )}
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 mb-2">
-          <p className="text-sm font-semibold text-slate-800">Summary Report</p>
-          {avgScore !== null && (
-            <span className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold">
-              Avg Integrity: {avgScore}/10
-            </span>
-          )}
-          <span className="px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-semibold">
-            Papers found: {foundCount}/{sortedReferences.length}
-          </span>
-        </div>
-        {summaryLoading ? (
-          <p className="text-xs text-slate-500 italic">Generating AI summary...</p>
-        ) : aiSummary ? (
-          <div className="relative">
-            {session ? (
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {aiSummary}
-              </p>
-            ) : (
-              <>
-                {(() => {
-                  const words = aiSummary.split(/\s+/);
-                  const first50 = words.slice(0, 50).join(' ');
-                  const remaining = words.slice(50).join(' ');
-                  return (
-                    <div>
-                      <p className="text-sm text-slate-700 leading-relaxed">
-                        {first50}
-                        {remaining && (
-                          <>
-                            {' '}
-                            <span className="filter blur-[2px] hover:blur-[0.6px] transition">
-                              {remaining}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                      {remaining && (
-                        <p className="mt-1 text-[10px] text-violet-600 font-semibold">
-                          Sign up to view the full AI summary
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-              </>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-500">No AI summary available.</p>
-        )}
-        {!session && (
-          <div className="mt-4">
-            <InlineSignUp onAuthSuccess={(newSession) => setSession(newSession)} />
-          </div>
-        )}
-      </div>
-
-      <ul className="space-y-4">
-        {sortedReferences.map((r) => (
-          <ReferenceItem key={r.id} reference={r} metadata={r.metadata} isSignedIn={!!session} />
-        ))}
-      </ul>
-    </div>
+    <ul className="space-y-4">
+      {sortedReferences.map((r) => (
+        <ReferenceItem key={r.id} reference={r} metadata={r.metadata} isSignedIn={!!session} />
+      ))}
+    </ul>
   );
 }

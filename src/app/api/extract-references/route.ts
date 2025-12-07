@@ -380,6 +380,13 @@ export async function POST(req: NextRequest) {
     const duration = Date.now() - startTime;
     console.log(`[extract-references] Extraction took ${duration}ms for ${referencesWithContext.length} references`);
 
+    // Save total references count to document (before limiting to 5)
+    const supabase = getSupabaseServiceClient();
+    await supabase
+      .from('documents')
+      .update({ total_references: referencesWithContext.length })
+      .eq('id', document.id);
+
     // 3) Save document references to database
     const documentReferences = await createDocumentReferences(
       document.id,
