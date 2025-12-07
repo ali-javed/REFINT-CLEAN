@@ -167,21 +167,7 @@ export default function ReferencesList({
   return (
     <div className="space-y-4">
       {session && (
-        <>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 flex items-center justify-between">
-            <p className="text-xs text-slate-600">Signed in as <span className="font-semibold">{session.user.email}</span></p>
-            <button
-              onClick={async () => {
-                await supabase?.auth.signOut();
-                router.push('/');
-              }}
-              className="text-xs font-semibold text-slate-700 hover:text-slate-900 underline"
-            >
-              Sign out
-            </button>
-          </div>
-          <PremiumButton session={session} />
-        </>
+        <PremiumButton session={session} />
       )}
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-3 mb-2">
