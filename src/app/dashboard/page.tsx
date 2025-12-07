@@ -35,29 +35,60 @@ export default function DashboardPage() {
 
         setSession(currentSession);
 
-        // Fetch profile
-        const { data: profileData, error: profileError } = await supabase
+        // Fetch profile - create if doesn't exist
+        let { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', currentSession.user.id)
           .single();
 
-        if (profileError) {
-          console.error('Profile error:', profileError);
-        } else {
+        if (profileError && profileError.code === 'PGRST116') {
+          // Profile doesn't exist, create it
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: currentSession.user.id,
+              email: currentSession.user.email || '',
+              full_name: currentSession.user.user_metadata?.full_name || ''
+            })
+            .select()
+            .single();
+          
+          if (!createError) {
+            profileData = newProfile;
+          }
+        }
+        
+        if (profileData) {
           setProfile(profileData as Profile);
         }
 
-        // Fetch user plan
-        const { data: planData, error: planError } = await supabase
+        // Fetch user plan - create if doesn't exist
+        let { data: planData, error: planError } = await supabase
           .from('user_plans')
           .select('*')
           .eq('user_id', currentSession.user.id)
           .single();
 
-        if (planError) {
-          console.error('Plan error:', planError);
-        } else {
+        if (planError && planError.code === 'PGRST116') {
+          // Plan doesn't exist, create default free plan
+          const { data: newPlan, error: createError } = await supabase
+            .from('user_plans')
+            .insert({
+              user_id: currentSession.user.id,
+              plan_type: 'free',
+              monthly_limit: 3,
+              monthly_used: 0
+            })
+            .select()
+            .single();
+          
+          if (!createError) {
+            planData = newPlan;
+          }
+        }
+        
+        if (planData) {
           setUserPlan(planData as UserPlan);
         }
 
