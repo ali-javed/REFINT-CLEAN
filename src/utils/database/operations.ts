@@ -130,15 +130,24 @@ export async function createDocument(params: {
 export async function updateDocumentStatus(
   documentId: string,
   status: 'uploaded' | 'processing' | 'completed' | 'failed',
-  overallIntegrityScore?: number
+  overallIntegrityScore?: number,
+  aiReviewReport?: string | null
 ) {
   const supabase = getSupabaseServiceClient();
 
+  const updateData: any = { status };
+  
+  if (overallIntegrityScore !== undefined) {
+    updateData.overall_integrity_score = overallIntegrityScore;
+  }
+  
+  if (aiReviewReport !== undefined) {
+    updateData.ai_review_report = aiReviewReport;
+  }
+
   const { data, error } = await (supabase as any)
     .from('documents')
-    .update({
-      status,
-    })
+    .update(updateData)
     .eq('id', documentId)
     .select()
     .single();

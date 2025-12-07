@@ -207,8 +207,10 @@ async function extractReferencesFromPdf(
     }
   }
 
+  const totalParsed = references.length;
+  
   console.log(
-    `Parsed ${references.length} references from ${fileName} (${contextsFound} with context)`
+    `Parsed ${totalParsed} references from ${fileName} (${contextsFound} with context)`
   );
 
   // Limit to first 5 references for faster processing
@@ -238,7 +240,7 @@ async function extractReferencesFromPdf(
   
   console.log(`Limiting to ${limitedReferences.length} references for processing`);
 
-  return limitedReferences;
+  return { references: limitedReferences, totalParsed };
 }
 
 /**
@@ -366,11 +368,14 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     
     let referencesWithContext;
+    let totalParsedCount;
     try {
       // Update status to processing
       await updateDocumentStatus(document.id, 'processing');
       
-      referencesWithContext = await extractReferencesFromPdf(buffer, file.name);
+      const result = await extractReferencesFromPdf(buffer, file.name);
+      referencesWithContext = result.references;
+      totalParsedCount = result.totalParsed;
     } catch (pdfError) {
       console.error('[extract-references] PDF extraction failed:', pdfError);
       await updateDocumentStatus(document.id, 'failed');
@@ -380,11 +385,11 @@ export async function POST(req: NextRequest) {
     const duration = Date.now() - startTime;
     console.log(`[extract-references] Extraction took ${duration}ms for ${referencesWithContext.length} references`);
 
-    // Save total references count to document (before limiting to 5)
+    // Save total references count to document (full parsed count, not limited)
     const supabase = getSupabaseServiceClient();
     await supabase
       .from('documents')
-      .update({ total_references: referencesWithContext.length })
+      .update({ total_references: totalParsedCount })
       .eq('id', document.id);
 
     // 3) Save document references to database
@@ -557,12 +562,92 @@ Respond with a JSON object: {"score": <number 0-100>, "comments": "<2-3 sentence
     const aiDuration = Date.now() - aiStartTime;
     console.log(`[extract-references] Two-step AI review took ${aiDuration}ms`);
 
-    // 5) Calculate overall document integrity score
+    // 5) Generate overall AI review summary
+    console.log('[extract-references] Generating overall AI review summary...');
+    let overallAiReview = null;
+    
+    try {
+      const openaiApiKey = process.env.OPENAI_API_KEY;
+      if (openaiApiKey) {
+        const supabase = getSupabaseServiceClient();
+        
+        // Fetch all AI reviews for this document
+        const { data: allReviews, error: fetchError } = await supabase
+          .from('document_references')
+          .select('raw_citation_text, existence_score, existence_check, context_integrity_score, context_integrity_review')
+          .eq('document_id', document.id);
+        
+        if (!fetchError && allReviews && allReviews.length > 0) {
+          // Build a summary of all individual reviews
+          const reviewsSummary = allReviews
+            .map((ref: any, idx: number) => {
+              let summary = `\n${idx + 1}. ${ref.raw_citation_text}\n`;
+              
+              if (ref.existence_score !== null) {
+                summary += `   Existence Score: ${ref.existence_score}/100\n`;
+                if (ref.existence_check) {
+                  summary += `   Existence Check: ${ref.existence_check}\n`;
+                }
+              }
+              
+              if (ref.context_integrity_score !== null) {
+                summary += `   Context Integrity Score: ${ref.context_integrity_score}/100\n`;
+                if (ref.context_integrity_review) {
+                  summary += `   Context Integrity Review: ${ref.context_integrity_review}\n`;
+                }
+              }
+              
+              return summary;
+            })
+            .join('\n');
+          
+          const summaryPrompt = `You are an academic journal reviewer. Below are the individual reference integrity reviews for a research document. Each reference has been analyzed for existence/formatting and context integrity.
+
+${reviewsSummary}
+
+Based on these individual reviews, provide a concise overall summary (2-3 paragraphs) of the reference integrity for this document. Address:
+1. Overall quality of references (formatting, completeness)
+2. How well references support their usage context
+3. Any patterns or concerns across the reference list
+4. Final recommendation
+
+Response format: Plain text summary (no JSON, no special formatting).`;
+
+          const summaryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openaiApiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are an academic journal reviewer providing concise, professional assessments of reference integrity.' },
+                { role: 'user', content: summaryPrompt },
+              ],
+              temperature: 0.5,
+            }),
+          });
+          
+          if (summaryResponse.ok) {
+            const data = await summaryResponse.json();
+            overallAiReview = data.choices?.[0]?.message?.content?.trim() || null;
+            console.log(`[extract-references] Generated overall AI review (${overallAiReview?.length || 0} chars)`);
+          } else {
+            console.error('[extract-references] Failed to generate overall AI review:', summaryResponse.status);
+          }
+        }
+      }
+    } catch (summaryError) {
+      console.error('[extract-references] Error generating overall AI review:', summaryError);
+    }
+
+    // 6) Calculate overall document integrity score
     const overallScore = await calculateDocumentIntegrityScore(document.id);
     console.log(`[extract-references] Overall document integrity score: ${overallScore}`);
 
-    // 6) Update document status to completed
-    await updateDocumentStatus(document.id, 'completed', overallScore || undefined);
+    // 7) Update document status to completed with AI review
+    await updateDocumentStatus(document.id, 'completed', overallScore || undefined, overallAiReview);
 
     console.log(`[extract-references] Successfully processed document ${document.id}`);
     
