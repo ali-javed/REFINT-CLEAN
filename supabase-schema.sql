@@ -1,5 +1,6 @@
--- ReferenceAudit Database Schema
+-- ReferenceAudit Database Schema - SIMPLIFIED VERSION
 -- Run this SQL in your Supabase SQL Editor
+-- This is the minimal working schema that avoids PostgREST cache issues
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -70,51 +71,19 @@ CREATE TABLE IF NOT EXISTS anon_sessions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Documents table
+-- 4. Documents table (SIMPLIFIED - only essential columns)
 CREATE TABLE IF NOT EXISTS documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  filename TEXT NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   anon_session_id UUID REFERENCES anon_sessions(id) ON DELETE CASCADE,
-  filename TEXT NOT NULL,
-  file_size INTEGER NOT NULL,
-  mime_type TEXT NOT NULL,
-  storage_path TEXT,
-  status TEXT NOT NULL CHECK (status IN ('uploaded', 'processing', 'completed', 'failed')),
-  overall_integrity_score NUMERIC(5,2),
-  total_references INTEGER DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'uploaded' CHECK (status IN ('uploaded', 'processing', 'completed', 'failed')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   CHECK (user_id IS NOT NULL OR anon_session_id IS NOT NULL)
 );
 
--- Add missing columns to documents if they don't exist
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='documents' AND column_name='user_id') THEN
-    ALTER TABLE documents ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='documents' AND column_name='anon_session_id') THEN
-    ALTER TABLE documents ADD COLUMN anon_session_id UUID REFERENCES anon_sessions(id) ON DELETE CASCADE;
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='documents' AND column_name='overall_integrity_score') THEN
-    ALTER TABLE documents ADD COLUMN overall_integrity_score NUMERIC(5,2);
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='documents' AND column_name='total_references') THEN
-    ALTER TABLE documents ADD COLUMN total_references INTEGER DEFAULT 0;
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='documents' AND column_name='storage_path') THEN
-    ALTER TABLE documents ADD COLUMN storage_path TEXT;
-  END IF;
-END $$;
+-- No additional column migrations needed for simplified schema
 
 -- 5. Canonical References table (reference database)
 CREATE TABLE IF NOT EXISTS canonical_references (
@@ -156,49 +125,16 @@ BEGIN
   END IF;
 END $$;
 
--- 6. Document References table (citations in uploaded documents)
+-- 6. Document References table (SIMPLIFIED - only essential columns)
 CREATE TABLE IF NOT EXISTS document_references (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-  canonical_reference_id UUID REFERENCES canonical_references(id) ON DELETE SET NULL,
   raw_citation_text TEXT NOT NULL,
-  parsed_title TEXT,
-  parsed_authors TEXT[],
-  parsed_year INTEGER,
-  context_before TEXT,
-  context_after TEXT,
-  claim_text TEXT,
-  position_in_doc INTEGER,
-  match_status TEXT CHECK (match_status IN ('pending', 'matched', 'not_found', 'ambiguous', 'error')),
-  integrity_score NUMERIC(5,2),
-  integrity_explanation TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add missing columns to document_references if they don't exist
-DO $$ 
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='document_references' AND column_name='integrity_score') THEN
-    ALTER TABLE document_references ADD COLUMN integrity_score NUMERIC(5,2);
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='document_references' AND column_name='integrity_explanation') THEN
-    ALTER TABLE document_references ADD COLUMN integrity_explanation TEXT;
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='document_references' AND column_name='claim_text') THEN
-    ALTER TABLE document_references ADD COLUMN claim_text TEXT;
-  END IF;
-  
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                 WHERE table_name='document_references' AND column_name='position_in_doc') THEN
-    ALTER TABLE document_references ADD COLUMN position_in_doc INTEGER;
-  END IF;
-END $$;
+-- No additional column migrations needed for simplified schema
 
 -- 7. Processing Jobs table (for background tasks)
 CREATE TABLE IF NOT EXISTS processing_jobs (
