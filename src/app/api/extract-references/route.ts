@@ -449,8 +449,7 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
                     .from('document_references')
                     .update({
                       integrity_score: score,
-                      integrity_explanation: explanation,
-                      match_status: 'matched',
+                      ai_review: explanation,
                     })
                     .eq('id', docRef.id);
                   

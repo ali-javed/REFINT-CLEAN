@@ -73,151 +73,124 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
   }, [reference]);
 
   return (
-    <li className="border border-slate-200 rounded-lg px-4 py-3 text-sm bg-slate-50">
-      <div className="mb-3">
-        <p className="font-semibold text-slate-900 mb-1">Reference:</p>
-        <p className="text-slate-800">{reference.raw_reference}</p>
-      </div>
-
+    <li className="border border-slate-200 rounded-lg px-4 py-3 text-sm bg-white shadow-sm">
+      {/* Context Section - Show first */}
       {(reference.context_before || reference.context_after) && (
-        <div className="mb-3 pl-3 border-l-2 border-amber-300 bg-amber-50 py-2">
-          <p className="text-xs font-medium text-amber-700 mb-2">Context:</p>
-          <p className="text-xs text-slate-700 leading-relaxed">
-            {reference.context_before && <span>{reference.context_before}</span>}
-            {reference.context_before && reference.context_after && (
-              <span className="mx-1 font-semibold text-amber-600">
-                {' '}
-                [...citation...]{' '}
-              </span>
+        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+          <p className="text-xs font-semibold text-blue-700 mb-2">📝 Context in Document:</p>
+          <p className="text-sm text-slate-800 leading-relaxed">
+            {reference.context_before && (
+              <span className="text-slate-600">{reference.context_before}</span>
             )}
-            {reference.context_after && <span>{reference.context_after}</span>}
+            <span className="mx-2 px-2 py-0.5 bg-yellow-200 font-semibold text-slate-900 rounded">
+              {reference.raw_reference}
+            </span>
+            {reference.context_after && (
+              <span className="text-slate-600">{reference.context_after}</span>
+            )}
           </p>
         </div>
       )}
 
-      {/* PDF Metadata Section */}
-      <div className="pl-3 border-l-2 border-violet-300 bg-violet-50 py-2">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <p className="text-xs font-medium text-violet-700">Full Paper:</p>
-          {pdfMetadata?.found && pdfMetadata?.integrity && (
-            <div className="flex items-center gap-2 group">
-              <div className="text-right" style={{ filter: isSignedIn ? 'none' : 'blur(2px)', transition: 'filter 0.2s' }} onMouseEnter={(e) => !isSignedIn && (e.currentTarget.style.filter = 'blur(0.6px)')} onMouseLeave={(e) => !isSignedIn && (e.currentTarget.style.filter = 'blur(2px)')}>
-                <p className="text-xs font-semibold text-emerald-600">
-                  {pdfMetadata.integrity.score}/10
-                </p>
-                <p className="text-xs text-emerald-600 font-medium">Integrity</p>
-                {pdfMetadata.integrity.analyzed && (
-                  <p className="text-xs text-amber-600 font-medium">AI Review</p>
-                )}
-              </div>
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                style={{
-                  background: `linear-gradient(to br, ${getScoreColor(
-                    pdfMetadata.integrity.score
-                  ).from}, ${getScoreColor(pdfMetadata.integrity.score).to})`,
-                  filter: isSignedIn ? 'none' : 'blur(1.5px)',
-                  transition: 'filter 0.2s',
-                }}
-                onMouseEnter={(e) => !isSignedIn && (e.currentTarget.style.filter = 'blur(0)')}
-                onMouseLeave={(e) => !isSignedIn && (e.currentTarget.style.filter = 'blur(1.5px)')}
-              >
-                {getScoreIcon(pdfMetadata.integrity.score)}
-              </div>
-            </div>
-          )}
-        </div>
+      {/* Reference Citation */}
+      <div className="mb-3">
+        <p className="text-xs font-semibold text-slate-600 mb-1">Reference Citation:</p>
+        <p className="text-sm text-slate-900 font-medium">{reference.raw_reference}</p>
+      </div>
 
+      {/* Paper Found Status */}
+      <div className="mb-3">
         {isLoading ? (
-          <p className="text-xs text-slate-600 italic">Loading...</p>
+          <p className="text-xs text-slate-500 italic">🔍 Checking for paper...</p>
         ) : pdfMetadata?.found ? (
-          <div className="text-xs text-slate-700 space-y-2">
-            {pdfMetadata.source === 'repo' ? (
-              <>
-                <p className="font-medium">✓ Available in Repository</p>
-                {pdfMetadata.fileName && pdfMetadata.fileExists !== false ? (
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <p className="italic">{pdfMetadata.fileName}</p>
-                    <a
-                      href={`/papers/${pdfMetadata.fileName}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      download
-                      className="px-2 py-1 text-xs font-semibold text-white bg-violet-600 rounded hover:bg-violet-700"
-                    >
-                      View PDF
-                    </a>
-                  </div>
-                ) : (
-                  <p className="text-slate-500">PDF missing from repo.</p>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="font-medium">✓ Available on arXiv</p>
+          <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">✓</span>
+              <p className="text-sm font-semibold text-green-700">
+                Paper Found on {pdfMetadata.source === 'arxiv' ? 'arXiv' : 'Repository'}
+              </p>
+            </div>
+            
+            {pdfMetadata.source === 'repo' && pdfMetadata.fileName ? (
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <p className="italic">{pdfMetadata.fileName}</p>
+                <a
+                  href={`/papers/${pdfMetadata.fileName}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-1 text-xs font-semibold text-white bg-green-600 rounded hover:bg-green-700"
+                >
+                  View PDF
+                </a>
+              </div>
+            ) : pdfMetadata.source === 'arxiv' && (pdfMetadata.arxiv?.pdfUrl || pdfMetadata.arxiv?.link) ? (
+              <div className="space-y-2">
                 {pdfMetadata.arxiv?.title && (
-                  <p className="text-slate-800 font-semibold">
+                  <p className="text-sm text-slate-800 font-medium">
                     {pdfMetadata.arxiv.title}
                   </p>
                 )}
-                {(pdfMetadata.arxiv?.pdfUrl || pdfMetadata.arxiv?.link) && (
-                  <div className="flex items-center gap-2 text-slate-600">
+                <div className="flex items-center gap-2">
+                  <a
+                    href={pdfMetadata.arxiv?.pdfUrl || pdfMetadata.arxiv?.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 rounded hover:bg-green-700"
+                  >
+                    View PDF
+                  </a>
+                  {pdfMetadata.arxiv?.link && (
                     <a
-                      href={pdfMetadata.arxiv?.pdfUrl || pdfMetadata.arxiv?.link}
+                      href={pdfMetadata.arxiv.link}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-2 py-1 text-xs font-semibold text-white bg-violet-600 rounded hover:bg-violet-700"
+                      className="text-xs underline text-green-700 hover:text-green-800"
                     >
-                      View PDF
+                      View on arXiv
                     </a>
-                    {pdfMetadata.arxiv?.link && (
-                      <a
-                        href={pdfMetadata.arxiv.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline text-violet-700"
-                      >
-                        View on arXiv
-                      </a>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-            {pdfMetadata.integrity?.justification && (
-              <div className="bg-blue-50 rounded p-2 border border-blue-200 relative">
-                <p className="font-medium text-blue-800 mb-1">AI Review:</p>
-                {isSignedIn ? (
-                  <p className="text-slate-700 leading-relaxed">
-                    {pdfMetadata.integrity.justification}
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-slate-700 leading-relaxed filter blur-[2px] hover:blur-[0.6px] transition">
-                      {pdfMetadata.integrity.justification}
-                    </p>
-                    <p className="absolute bottom-1 right-2 text-[10px] text-blue-500 font-semibold">
-                      Sign up to reveal fully
-                    </p>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
-            )}
+            ) : null}
+          </div>
+        ) : (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">✗</span>
+              <p className="text-sm font-semibold text-red-700">Paper Not Found</p>
+            </div>
+          </div>
+        )}
+      </div>
 
-            {pdfMetadata.summary && (
-              <div className="bg-white rounded p-2 border border-violet-200">
-                <p className="font-medium text-slate-800 mb-1">Abstract:</p>
-                <p className="text-slate-700 leading-relaxed">
-                  {pdfMetadata.summary}
-                </p>
+      {/* AI Review Section */}
+      {pdfMetadata?.integrity?.justification && (
+        <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-purple-700">🤖 AI Review</p>
+            {pdfMetadata.integrity.score && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-purple-900">
+                  {pdfMetadata.integrity.score}/10
+                </span>
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                  style={{
+                    background: `linear-gradient(to br, ${getScoreColor(
+                      pdfMetadata.integrity.score
+                    ).from}, ${getScoreColor(pdfMetadata.integrity.score).to})`,
+                  }}
+                >
+                  {getScoreIcon(pdfMetadata.integrity.score)}
+                </div>
               </div>
             )}
           </div>
-        ) : (
-          <p className="text-xs text-slate-500">✗ Full paper not found</p>
-        )}
-      </div>
+          <p className="text-sm text-slate-700 leading-relaxed">
+            {pdfMetadata.integrity.justification}
+          </p>
+        </div>
+      )}
     </li>
   );
 }
