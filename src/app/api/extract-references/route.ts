@@ -393,31 +393,32 @@ export async function POST(req: NextRequest) {
     
     console.log(`[extract-references] Created ${documentReferences.length} document references`);
 
-    // 4) Process references with AI to calculate integrity scores
-    console.log('[extract-references] Starting AI review of references...');
+    // 4) Process references with AI - Two-step review process
+    console.log('[extract-references] Starting two-step AI review of references...');
     const aiStartTime = Date.now();
     
     try {
-      // Call OpenAI API to review each reference
       const openaiApiKey = process.env.OPENAI_API_KEY;
       if (!openaiApiKey) {
         console.warn('[extract-references] OpenAI API key not configured, skipping AI review');
       } else {
+        const supabase = getSupabaseServiceClient();
+        
         for (const docRef of documentReferences) {
           try {
-            // Simple AI review: check if reference looks valid
-            const prompt = `Analyze this academic reference and rate its integrity on a scale of 0-100. Consider factors like:
+            // STEP 1: Existence Check - Does the reference exist and is it properly formatted?
+            const existencePrompt = `Analyze this academic reference and rate its existence/completeness on a scale of 0-100. Consider factors like:
 - Does it have author names?
 - Does it have a title?
 - Does it have a year?
 - Does it look properly formatted?
-- Is it complete?
+- Is it complete and parseable?
 
 Reference: ${docRef.raw_citation_text}
 
 Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief explanation>"}`;
             
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            const existenceResponse = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -427,41 +428,102 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
                 model: 'gpt-3.5-turbo',
                 messages: [
                   { role: 'system', content: 'You are an academic reference validation assistant.' },
-                  { role: 'user', content: prompt },
+                  { role: 'user', content: existencePrompt },
                 ],
                 temperature: 0.3,
               }),
             });
             
-            if (response.ok) {
-              const data = await response.json();
+            let existenceScore = null;
+            let existenceCheck = null;
+            
+            if (existenceResponse.ok) {
+              const data = await existenceResponse.json();
               const content = data.choices?.[0]?.message?.content;
               
               if (content) {
                 try {
                   const result = JSON.parse(content);
-                  const score = Math.max(0, Math.min(100, result.score || 50));
-                  const explanation = result.explanation || 'AI review completed';
-                  
-                  // Update the reference with AI scores using service client to bypass RLS
-                  const supabase = getSupabaseServiceClient();
-                  const { error: updateError } = await (supabase as any)
-                    .from('document_references')
-                    .update({
-                      integrity_score: score,
-                      ai_review: explanation,
-                    })
-                    .eq('id', docRef.id);
-                  
-                  if (updateError) {
-                    console.error(`[extract-references] Failed to update reference ${docRef.id}:`, updateError);
-                  } else {
-                    console.log(`[extract-references] AI review for reference ${docRef.id}: ${score}/100`);
-                  }
+                  existenceScore = Math.max(0, Math.min(100, result.score || 50));
+                  existenceCheck = result.explanation || 'Existence check completed';
+                  console.log(`[extract-references] Existence check for ${docRef.id}: ${existenceScore}/100`);
                 } catch (parseError) {
-                  console.error('[extract-references] Failed to parse AI response:', parseError);
+                  console.error('[extract-references] Failed to parse existence check response:', parseError);
                 }
               }
+            }
+            
+            // STEP 2: Context Integrity Check - Does the paper support how it's being referenced?
+            let contextIntegrityScore = null;
+            let contextIntegrityReview = null;
+            
+            if (docRef.context_before || docRef.context_after) {
+              const context = `${docRef.context_before || ''} [CITATION: ${docRef.raw_citation_text}] ${docRef.context_after || ''}`;
+              
+              const contextPrompt = `You are an academic paper reviewer. Analyze how this paper is being referenced in context.
+
+Context: ${context}
+
+Reference Citation: ${docRef.raw_citation_text}
+
+Note: The full PDF content is not available yet. Based on the citation and context alone:
+1. Give 2-3 brief comments on whether the authors appear to be referencing the paper appropriately
+2. Assess if the citation seems relevant to the context in which it's used
+3. Rate the alignment between the context and what this type of reference would typically support
+
+Return an integrity score (0-100) for how well the reference appears to support its usage context.
+
+Respond with a JSON object: {"score": <number 0-100>, "comments": "<2-3 sentences>"}`;
+              
+              const contextResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${openaiApiKey}`,
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o-mini',
+                  messages: [
+                    { role: 'system', content: 'You are an academic paper reviewer specializing in citation integrity.' },
+                    { role: 'user', content: contextPrompt },
+                  ],
+                  temperature: 0.4,
+                }),
+              });
+              
+              if (contextResponse.ok) {
+                const data = await contextResponse.json();
+                const content = data.choices?.[0]?.message?.content;
+                
+                if (content) {
+                  try {
+                    const result = JSON.parse(content);
+                    contextIntegrityScore = Math.max(0, Math.min(100, result.score || 50));
+                    contextIntegrityReview = result.comments || 'Context integrity check completed';
+                    console.log(`[extract-references] Context integrity for ${docRef.id}: ${contextIntegrityScore}/100`);
+                  } catch (parseError) {
+                    console.error('[extract-references] Failed to parse context integrity response:', parseError);
+                  }
+                }
+              }
+            }
+            
+            // Update the reference with both AI scores
+            const { error: updateError } = await (supabase as any)
+              .from('document_references')
+              .update({
+                existence_score: existenceScore,
+                existence_check: existenceCheck,
+                context_integrity_score: contextIntegrityScore,
+                context_integrity_review: contextIntegrityReview,
+                // Keep old fields for backward compatibility
+                integrity_score: contextIntegrityScore || existenceScore,
+                ai_review: contextIntegrityReview || existenceCheck,
+              })
+              .eq('id', docRef.id);
+            
+            if (updateError) {
+              console.error(`[extract-references] Failed to update reference ${docRef.id}:`, updateError);
             }
           } catch (aiError) {
             console.error(`[extract-references] AI review failed for reference ${docRef.id}:`, aiError);
@@ -473,7 +535,7 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
     }
     
     const aiDuration = Date.now() - aiStartTime;
-    console.log(`[extract-references] AI review took ${aiDuration}ms`);
+    console.log(`[extract-references] Two-step AI review took ${aiDuration}ms`);
 
     // 5) Calculate overall document integrity score
     const overallScore = await calculateDocumentIntegrityScore(document.id);

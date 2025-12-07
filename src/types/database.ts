@@ -166,6 +166,10 @@ export interface Database {
           position_in_doc: number | null;
           integrity_score: number | null;
           ai_review: string | null;
+          existence_score: number | null;
+          existence_check: string | null;
+          context_integrity_score: number | null;
+          context_integrity_review: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -183,6 +187,10 @@ export interface Database {
           position_in_doc?: number | null;
           integrity_score?: number | null;
           ai_review?: string | null;
+          existence_score?: number | null;
+          existence_check?: string | null;
+          context_integrity_score?: number | null;
+          context_integrity_review?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -200,6 +208,10 @@ export interface Database {
           position_in_doc?: number | null;
           integrity_score?: number | null;
           ai_review?: string | null;
+          existence_score?: number | null;
+          existence_check?: string | null;
+          context_integrity_score?: number | null;
+          context_integrity_review?: string | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -15,6 +15,10 @@ interface Reference {
   context_after?: string | null;
   integrity_score?: number | null;
   integrity_explanation?: string | null;
+  existence_score?: number | null;
+  existence_check?: string | null;
+  context_integrity_score?: number | null;
+  context_integrity_review?: string | null;
   match_status?: string | null;
 }
 

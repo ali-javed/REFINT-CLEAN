@@ -28,6 +28,10 @@ interface ReferenceItemProps {
     raw_reference: string;
     context_before?: string | null;
     context_after?: string | null;
+    existence_score?: number | null;
+    existence_check?: string | null;
+    context_integrity_score?: number | null;
+    context_integrity_review?: string | null;
   };
   metadata?: PdfMetadata | null;
   loading?: boolean;
@@ -163,32 +167,61 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
         )}
       </div>
 
-      {/* AI Review Section */}
-      {pdfMetadata?.integrity?.justification && (
+      {/* Existence Check Section */}
+      {reference.existence_score !== null && reference.existence_score !== undefined && (
+        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-blue-700">✓ Existence Check</p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-blue-900">
+                {reference.existence_score}/100
+              </span>
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                style={{
+                  background: `linear-gradient(to br, ${getScoreColor(
+                    reference.existence_score / 10
+                  ).from}, ${getScoreColor(reference.existence_score / 10).to})`,
+                }}
+              >
+                {getScoreIcon(reference.existence_score / 10)}
+              </div>
+            </div>
+          </div>
+          {reference.existence_check && (
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {reference.existence_check}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Context Integrity Section */}
+      {reference.context_integrity_score !== null && reference.context_integrity_score !== undefined && (
         <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-semibold text-purple-700">🤖 AI Review</p>
-            {pdfMetadata.integrity.score && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-purple-900">
-                  {pdfMetadata.integrity.score}/10
-                </span>
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
-                  style={{
-                    background: `linear-gradient(to br, ${getScoreColor(
-                      pdfMetadata.integrity.score
-                    ).from}, ${getScoreColor(pdfMetadata.integrity.score).to})`,
-                  }}
-                >
-                  {getScoreIcon(pdfMetadata.integrity.score)}
-                </div>
+            <p className="text-sm font-semibold text-purple-700">🤖 Context Integrity Review</p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-purple-900">
+                {reference.context_integrity_score}/100
+              </span>
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
+                style={{
+                  background: `linear-gradient(to br, ${getScoreColor(
+                    reference.context_integrity_score / 10
+                  ).from}, ${getScoreColor(reference.context_integrity_score / 10).to})`,
+                }}
+              >
+                {getScoreIcon(reference.context_integrity_score / 10)}
               </div>
-            )}
+            </div>
           </div>
-          <p className="text-sm text-slate-700 leading-relaxed">
-            {pdfMetadata.integrity.justification}
-          </p>
+          {reference.context_integrity_review && (
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {reference.context_integrity_review}
+            </p>
+          )}
         </div>
       )}
     </li>

@@ -63,7 +63,7 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
   // Then get the document references
   const { data, error } = await supabase
     .from('document_references')
-    .select('id, raw_citation_text, first_author, second_author, last_author, year, publication, context_before, context_after, integrity_score, ai_review, position_in_doc, created_at')
+    .select('id, raw_citation_text, first_author, second_author, last_author, year, publication, context_before, context_after, integrity_score, ai_review, existence_score, existence_check, context_integrity_score, context_integrity_review, position_in_doc, created_at')
     .eq('document_id', documentId)
     .order('position_in_doc', { ascending: true, nullsFirst: false });
 
@@ -91,6 +91,10 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
     context_after: ref.context_after,
     integrity_score: ref.integrity_score,
     integrity_explanation: ref.ai_review,
+    existence_score: ref.existence_score,
+    existence_check: ref.existence_check,
+    context_integrity_score: ref.context_integrity_score,
+    context_integrity_review: ref.context_integrity_review,
     match_status: null,
     created_at: ref.created_at,
   }));
