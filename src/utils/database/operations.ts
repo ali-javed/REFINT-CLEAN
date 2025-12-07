@@ -114,56 +114,16 @@ export async function createDocument(params: {
     throw new Error('Either userId or anonSessionId must be provided');
   }
 
-  // Use exact snake_case column names as they appear in database
-  const documentInsert: any = {};
-  documentInsert.filename = params.filename;
-  documentInsert.file_size = params.fileSize;
-  documentInsert.mime_type = params.mimeType;
-  documentInsert.storage_path = params.storagePath || null;
-  documentInsert.user_id = params.userId || null;
-  documentInsert.anon_session_id = params.anonSessionId || null;
-  documentInsert.status = 'uploaded';
-  documentInsert.total_references = 0;
+  // Simplified insert - only use columns that definitely exist in cache
+  const documentInsert: any = {
+    filename: params.filename,
+    user_id: params.userId || null,
+    anon_session_id: params.anonSessionId || null,
+    status: 'uploaded',
+  };
 
-  console.log('[createDocument] Inserting document:', JSON.stringify(documentInsert, null, 2));
+  console.log('[createDocument] Inserting document (simplified):', JSON.stringify(documentInsert, null, 2));
 
-  // Try direct HTTP request to bypass client cache
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (supabaseUrl && serviceKey) {
-    try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/documents?select=*`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': serviceKey,
-          'Authorization': `Bearer ${serviceKey}`,
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify(documentInsert),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[createDocument] Direct insert successful:', data);
-        
-        // Increment upload count for anon sessions
-        if (params.anonSessionId) {
-          await incrementAnonSessionUploads(params.anonSessionId);
-        }
-        
-        return (Array.isArray(data) ? data[0] : data) as Document;
-      } else {
-        const errorText = await response.text();
-        console.error('[createDocument] Direct insert failed:', response.status, errorText);
-      }
-    } catch (fetchError) {
-      console.error('[createDocument] Direct fetch failed:', fetchError);
-    }
-  }
-
-  // Fallback to Supabase client
   const { data, error } = await supabase
     .from('documents')
     .insert(documentInsert)
