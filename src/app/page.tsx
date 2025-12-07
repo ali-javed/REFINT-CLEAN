@@ -180,7 +180,7 @@ export default function HomePage() {
             Three layers of reference verification
           </h2>
           <p className="mt-3 text-sm text-zinc-400 sm:text-base">
-            We don&apos;t just check if a citation exists. We test whether it actually says what you claim it says.
+            We don&apos;t just check if a citation exists. We test whether it actually says what the document claims.
           </p>
         </div>
 

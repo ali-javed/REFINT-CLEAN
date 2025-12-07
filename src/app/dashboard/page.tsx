@@ -4,17 +4,19 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 import type { Session, User } from '@supabase/supabase-js';
-import type { Profile, UserPlan } from '@/types/database';
+import type { Profile, UserPlan, Document } from '@/types/database';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [resettingPassword, setResettingPassword] = useState(false);
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const supabase = getBrowserSupabaseClient();
 
@@ -54,6 +56,19 @@ export default function DashboardPage() {
           console.error('Plan error:', planError);
         } else {
           setUserPlan(planData as UserPlan);
+        }
+
+        // Fetch user documents
+        const { data: docsData, error: docsError } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', currentSession.user.id)
+          .order('created_at', { ascending: false });
+
+        if (docsError) {
+          console.error('Documents error:', docsError);
+        } else {
+          setDocuments(docsData as Document[]);
         }
       } catch (err) {
         console.error('Error fetching user data:', err);
@@ -98,6 +113,49 @@ export default function DashboardPage() {
     }
   };
 
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/extract-references', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        console.error('Upload error:', json);
+        alert(`Error: ${json.error || json.message || 'Upload failed'}`);
+        return;
+      }
+
+      if (json.documentId) {
+        router.push(`/references/${json.documentId}`);
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'processing':
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      case 'failed':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      default:
+        return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -123,12 +181,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50">
-      <div className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="mt-1 text-sm text-zinc-400">Manage your account and view your activity</p>
+            <p className="mt-1 text-sm text-zinc-400">Welcome back, {profile?.full_name || session.user.email?.split('@')[0]}</p>
           </div>
           <button
             onClick={() => router.push('/')}
@@ -136,6 +194,120 @@ export default function DashboardPage() {
           >
             ← Back to Home
           </button>
+        </div>
+
+        {/* Quick Actions & Plan Overview */}
+        <div className="mb-8 grid gap-6 md:grid-cols-2">
+          {/* Upload Card */}
+          <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 to-indigo-500/10 p-6">
+            <h2 className="mb-2 text-xl font-semibold">Get Started</h2>
+            <p className="mb-4 text-sm text-zinc-400">
+              Upload a document to verify your references
+            </p>
+            <label htmlFor="dashboard-upload" className="cursor-pointer">
+              <input
+                id="dashboard-upload"
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file);
+                }}
+              />
+              <span className="inline-block rounded-full bg-violet-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-violet-500">
+                {uploading ? 'Uploading...' : '📄 Upload Document'}
+              </span>
+            </label>
+          </div>
+
+          {/* Plan Card */}
+          {userPlan && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+              <h2 className="mb-3 text-xl font-semibold">Your Plan</h2>
+              <div className="mb-4 flex items-center gap-3">
+                <span className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-base font-medium ${getPlanBadgeColor(userPlan.plan_type)}`}>
+                  {userPlan.plan_type === 'pro' && '⭐'}
+                  {userPlan.plan_type === 'academic' && '🎓'}
+                  {userPlan.plan_type === 'free' && '📄'}
+                  {userPlan.plan_type.charAt(0).toUpperCase() + userPlan.plan_type.slice(1)}
+                </span>
+              </div>
+              <div className="mb-3">
+                <div className="mb-1 flex items-center justify-between text-sm">
+                  <span className="text-zinc-300">Documents this month</span>
+                  <span className="font-medium text-zinc-100">
+                    {userPlan.monthly_used} / {userPlan.monthly_limit === 999999 ? '∞' : userPlan.monthly_limit}
+                  </span>
+                </div>
+                {userPlan.monthly_limit !== 999999 && (
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                    <div
+                      className="h-full bg-violet-600 transition-all"
+                      style={{
+                        width: `${Math.min((userPlan.monthly_used / userPlan.monthly_limit) * 100, 100)}%`,
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              {userPlan.plan_type === 'free' && (
+                <button className="mt-2 w-full rounded-full bg-indigo-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-400">
+                  Upgrade to Pro
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Documents Section */}
+        <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+          <h2 className="mb-4 text-xl font-semibold">Your Documents</h2>
+          
+          {documents.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="mb-4 text-5xl opacity-50">📄</div>
+              <p className="mb-2 text-zinc-400">No documents yet</p>
+              <p className="text-sm text-zinc-500">Upload your first document to get started</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 transition hover:border-zinc-700"
+                >
+                  <div className="flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      <h3 className="font-medium text-zinc-100">{doc.filename}</h3>
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(doc.status)}`}>
+                        {doc.status === 'completed' && '✓'}
+                        {doc.status === 'processing' && '⏳'}
+                        {doc.status === 'failed' && '✗'}
+                        {doc.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-zinc-500">
+                      <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                      <span>{doc.total_references} references</span>
+                      {doc.overall_integrity_score !== null && (
+                        <span className="font-medium text-zinc-400">
+                          Score: {Math.round(doc.overall_integrity_score)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/references/${doc.id}`)}
+                    className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-violet-500 hover:text-violet-400"
+                  >
+                    View Report
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Profile Section */}
@@ -179,10 +351,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Plan Section */}
+        {/* Plan Details Section */}
         {userPlan && (
           <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-            <h2 className="mb-4 text-xl font-semibold">Subscription Plan</h2>
+            <h2 className="mb-4 text-xl font-semibold">Subscription Details</h2>
             
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -199,30 +371,6 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-zinc-400">Usage This Period</label>
-                <div className="mt-2">
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-zinc-100">{userPlan.monthly_used} of {userPlan.monthly_limit === 999999 ? 'Unlimited' : userPlan.monthly_limit} documents</span>
-                    {userPlan.monthly_limit !== 999999 && (
-                      <span className="text-zinc-400">
-                        {Math.round((userPlan.monthly_used / userPlan.monthly_limit) * 100)}%
-                      </span>
-                    )}
-                  </div>
-                  {userPlan.monthly_limit !== 999999 && (
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-                      <div
-                        className="h-full bg-violet-600 transition-all"
-                        style={{
-                          width: `${Math.min((userPlan.monthly_used / userPlan.monthly_limit) * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium text-zinc-400">Period Start</label>
@@ -237,12 +385,6 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-
-              {userPlan.plan_type === 'free' && (
-                <button className="mt-4 w-full rounded-full bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400">
-                  Upgrade to Pro
-                </button>
-              )}
             </div>
           </div>
         )}
