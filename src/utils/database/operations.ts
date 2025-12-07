@@ -7,18 +7,12 @@
 
 import { getSupabaseServiceClient } from '@/utils/supabase/client';
 import type {
-  AnonSessionInsert,
   DocumentInsert,
   DocumentReferenceInsert,
   DocumentReferenceUpdate,
-  AuditFeedbackInsert,
   DocumentReferenceWithFeedback,
-  AnonSession,
   Document,
   DocumentReference,
-  AuditFeedback,
-  ProcessingJob,
-  UserUsage,
 } from '@/types/database';
 import { randomUUID } from 'crypto';
 
@@ -269,7 +263,7 @@ export async function createAuditFeedback(params: {
 }) {
   const supabase = getSupabaseServiceClient();
 
-  const feedbackData: AuditFeedbackInsert = {
+  const feedbackData: any = {
     document_reference_id: params.documentReferenceId,
     feedback_type: params.feedbackType,
     comment: params.comment || null,
@@ -286,7 +280,7 @@ export async function createAuditFeedback(params: {
     throw new Error(`Failed to create audit feedback: ${error.message}`);
   }
 
-  return data as AuditFeedback;
+  return data as any;
 }
 
 /**
@@ -339,23 +333,6 @@ export async function getDocumentWithReferences(documentId: string) {
     ...(document as Document),
     document_references: references,
   };
-}
-
-/**
- * Get or create an anonymous session by client token
- */
-export async function getOrCreateAnonSession(clientToken?: string) {
-  const token = clientToken || randomUUID();
-
-  // Try to get existing session
-  const existingSession = await getAnonSessionByToken(token);
-  
-  if (existingSession) {
-    return existingSession;
-  }
-
-  // Create new session if not found
-  return await createAnonSession(token);
 }
 
 /**
