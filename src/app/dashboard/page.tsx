@@ -115,11 +115,6 @@ export default function DashboardPage() {
     fetchUserData();
   }, [supabase, router]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
-
   const handleResetPassword = async () => {
     if (!session?.user?.email) return;
 
@@ -598,16 +593,6 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end">
-          <button
-            onClick={handleSignOut}
-            className="rounded-lg border border-red-700 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/10"
-          >
-            Sign Out
-          </button>
         </div>
       </div>
     </div>

@@ -6,59 +6,6 @@ import UploadForm from '@/components/UploadForm';
 import Sidebar from '@/components/Sidebar';
 import { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 
-function UserMenu({ userName, userEmail }: { userName: string; userEmail: string }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const supabase = getBrowserSupabaseClient();
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = '/';
-  };
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="rounded-full border border-violet-700 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-300 backdrop-blur-sm transition hover:bg-violet-600/30 flex items-center gap-2"
-      >
-        <span>{userName}</span>
-        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl z-20">
-            <div className="px-4 py-3 border-b border-zinc-800">
-              <p className="text-sm font-medium text-zinc-100">{userName}</p>
-              <p className="text-xs text-zinc-400 truncate">{userEmail}</p>
-            </div>
-            <div className="py-1">
-              <a
-                href="/dashboard"
-                className="block px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition"
-              >
-                📊 Dashboard
-              </a>
-              <button
-                onClick={handleSignOut}
-                className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-zinc-800 transition"
-              >
-                🚪 Sign Out
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 const integrityRanges = [
   { label: '90–100', title: 'Perfectly matched & verified', desc: 'The reference clearly supports the claim and matches the original context.' },
   { label: '70–89', title: 'Minor interpretation drift', desc: 'Mostly accurate but with small stretches or interpretation differences.' },
@@ -168,28 +115,6 @@ export default function HomePage() {
         {/* Hero */}
         <section id="hero" className="relative overflow-hidden border-b border-zinc-800">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_#4f46e5_0,_transparent_55%)] opacity-30" />
-        
-        {/* Sign In Link - Top Right */}
-        {!session && (
-          <div className="absolute top-4 right-4 z-10">
-            <a
-              href="/signin"
-              className="rounded-full border border-zinc-700 bg-zinc-900/50 px-4 py-2 text-sm font-medium text-zinc-100 backdrop-blur-sm transition hover:border-violet-500 hover:bg-zinc-800"
-            >
-              Sign In
-            </a>
-          </div>
-        )}
-
-        {/* User Menu - Top Right (when signed in) */}
-        {session && (
-          <div className="absolute top-4 right-4 z-10">
-            <UserMenu 
-              userName={session.user.email?.split('@')[0] || 'User'} 
-              userEmail={session.user.email || ''}
-            />
-          </div>
-        )}
 
         <div className="relative mx-auto flex max-w-5xl flex-col items-center px-4 py-20 text-center sm:px-6 lg:px-8">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
