@@ -126,10 +126,12 @@ BEGIN
 END $$;
 
 -- 6. Document References table (SIMPLIFIED - only essential columns)
-CREATE TABLE IF NOT EXISTS document_references (
+CREATE TABLE document_references (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   raw_citation_text TEXT NOT NULL,
+  context_before TEXT,
+  context_after TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

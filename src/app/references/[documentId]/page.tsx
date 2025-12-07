@@ -63,9 +63,9 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
   // Then get the document references
   const { data, error } = await supabase
     .from('document_references')
-    .select('id, raw_citation_text, context_before, context_after, integrity_score, integrity_explanation, match_status, created_at')
+    .select('id, raw_citation_text, context_before, context_after, created_at')
     .eq('document_id', documentId)
-    .order('position_in_doc', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.error('Error loading references:', error);
@@ -84,9 +84,9 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
     raw_reference: ref.raw_citation_text,
     context_before: ref.context_before,
     context_after: ref.context_after,
-    integrity_score: ref.integrity_score,
-    integrity_explanation: ref.integrity_explanation,
-    match_status: ref.match_status,
+    integrity_score: null,
+    integrity_explanation: null,
+    match_status: null,
     created_at: ref.created_at,
   }));
 

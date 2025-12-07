@@ -265,10 +265,12 @@ export async function createDocumentReferences(
 ) {
   const supabase = getSupabaseServiceClient();
 
-  // Simplified - only use columns that exist in the table
+  // Include context columns if available
   const referencesData = references.map((ref) => ({
     document_id: documentId,
     raw_citation_text: ref.rawCitationText,
+    context_before: ref.contextBefore || null,
+    context_after: ref.contextAfter || null,
   }));
 
   const { data, error } = await supabase
