@@ -444,13 +444,19 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
                   
                   // Update the reference with AI scores
                   const supabase = getSupabaseClient();
+                  const updateData: {
+                    integrity_score: number;
+                    integrity_explanation: string;
+                    match_status: string;
+                  } = {
+                    integrity_score: score,
+                    integrity_explanation: explanation,
+                    match_status: 'matched',
+                  };
+                  
                   await supabase
                     .from('document_references')
-                    .update({
-                      integrity_score: score,
-                      integrity_explanation: explanation,
-                      match_status: 'matched',
-                    } as any)
+                    .update(updateData as any)
                     .eq('id', docRef.id);
                   
                   console.log(`[extract-references] AI review for reference ${docRef.id}: ${score}/100`);
