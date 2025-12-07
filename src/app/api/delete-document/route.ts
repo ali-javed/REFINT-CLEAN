@@ -1,0 +1,65 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { deleteDocument } from '@/utils/database/operations';
+import { getSupabaseServiceClient } from '@/utils/supabase/client';
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const documentId = searchParams.get('documentId');
+    const userId = searchParams.get('userId');
+    const anonSessionId = searchParams.get('anonSessionId');
+
+    if (!documentId) {
+      return NextResponse.json(
+        { error: 'documentId is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!userId && !anonSessionId) {
+      return NextResponse.json(
+        { error: 'userId or anonSessionId is required' },
+        { status: 400 }
+      );
+    }
+
+    // Verify ownership before deleting
+    const supabase = getSupabaseServiceClient();
+    const { data: docs, error: fetchError } = await supabase
+      .from('documents')
+      .select('user_id, anon_session_id')
+      .eq('id', documentId);
+
+    if (fetchError || !docs || docs.length === 0) {
+      return NextResponse.json(
+        { error: 'Document not found' },
+        { status: 404 }
+      );
+    }
+
+    const doc = docs[0] as any;
+
+    // Check ownership
+    const isOwner = userId 
+      ? doc.user_id === userId 
+      : doc.anon_session_id === anonSessionId;
+
+    if (!isOwner) {
+      return NextResponse.json(
+        { error: 'Not authorized to delete this document' },
+        { status: 403 }
+      );
+    }
+
+    // Delete the document
+    await deleteDocument(documentId);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[delete-document] Error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete document' },
+      { status: 500 }
+    );
+  }
+}

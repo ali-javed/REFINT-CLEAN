@@ -143,28 +143,34 @@ export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
         {isLoading ? 'Verifying…' : 'Verify references'}
       </button>
 
-      {/* Duplicate file actions */}
+      {/* Duplicate file confirmation */}
       {duplicateDocId && !isLoading && (
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => router.push(`/references/${duplicateDocId}`)}
-            className="flex-1 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 text-sm font-medium px-4 py-2.5 hover:bg-slate-50 transition"
-          >
-            View existing
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              const form = e.currentTarget.closest('form');
-              if (form) {
-                handleSubmit({ currentTarget: form, preventDefault: () => {} } as any, true);
-              }
-            }}
-            className="flex-1 inline-flex items-center justify-center rounded-full border border-slate-900 bg-slate-900 text-white text-sm font-medium px-4 py-2.5 hover:bg-black transition"
-          >
-            Overwrite
-          </button>
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <div className="mb-3">
+            <p className="text-sm font-medium text-amber-600 mb-1">⚠️ Duplicate File Detected</p>
+            <p className="text-xs text-slate-600">A document with this filename already exists. What would you like to do?</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(`/references/${duplicateDocId}`)}
+              className="flex-1 inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 transition"
+            >
+              📄 View Existing
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                const form = e.currentTarget.closest('form');
+                if (form) {
+                  handleSubmit({ currentTarget: form, preventDefault: () => {} } as any, true);
+                }
+              }}
+              className="flex-1 inline-flex items-center justify-center rounded-lg border border-amber-600 bg-amber-600 text-white text-sm font-medium px-4 py-2 hover:bg-amber-700 transition"
+            >
+              ✓ Overwrite
+            </button>
+          </div>
         </div>
       )}
 
