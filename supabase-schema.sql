@@ -58,6 +58,20 @@ CREATE TABLE IF NOT EXISTS documents (
   CHECK (user_id IS NOT NULL OR anon_session_id IS NOT NULL)
 );
 
+-- Add missing columns to documents if they don't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='overall_integrity_score') THEN
+    ALTER TABLE documents ADD COLUMN overall_integrity_score NUMERIC(5,2);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='total_references') THEN
+    ALTER TABLE documents ADD COLUMN total_references INTEGER DEFAULT 0;
+  END IF;
+END $$;
+
 -- 5. Canonical References table (reference database)
 CREATE TABLE IF NOT EXISTS canonical_references (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -65,7 +79,7 @@ CREATE TABLE IF NOT EXISTS canonical_references (
   authors TEXT[],
   publication_year INTEGER,
   doi TEXT,
-  arxiv_id TEXT,
+  external_id TEXT,
   pdf_url TEXT,
   abstract TEXT,
   source TEXT CHECK (source IN ('crossref', 'semantic_scholar', 'arxiv', 'manual')),
@@ -73,6 +87,30 @@ CREATE TABLE IF NOT EXISTS canonical_references (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add missing columns to canonical_references if they don't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='canonical_references' AND column_name='external_id') THEN
+    ALTER TABLE canonical_references ADD COLUMN external_id TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='canonical_references' AND column_name='pdf_url') THEN
+    ALTER TABLE canonical_references ADD COLUMN pdf_url TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='canonical_references' AND column_name='abstract') THEN
+    ALTER TABLE canonical_references ADD COLUMN abstract TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='canonical_references' AND column_name='source') THEN
+    ALTER TABLE canonical_references ADD COLUMN source TEXT;
+  END IF;
+END $$;
 
 -- 6. Document References table (citations in uploaded documents)
 CREATE TABLE IF NOT EXISTS document_references (
@@ -93,6 +131,30 @@ CREATE TABLE IF NOT EXISTS document_references (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add missing columns to document_references if they don't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='document_references' AND column_name='integrity_score') THEN
+    ALTER TABLE document_references ADD COLUMN integrity_score NUMERIC(5,2);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='document_references' AND column_name='integrity_explanation') THEN
+    ALTER TABLE document_references ADD COLUMN integrity_explanation TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='document_references' AND column_name='claim_text') THEN
+    ALTER TABLE document_references ADD COLUMN claim_text TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='document_references' AND column_name='position_in_doc') THEN
+    ALTER TABLE document_references ADD COLUMN position_in_doc INTEGER;
+  END IF;
+END $$;
 
 -- 7. Processing Jobs table (for background tasks)
 CREATE TABLE IF NOT EXISTS processing_jobs (
@@ -138,10 +200,18 @@ CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_document_references_document_id ON document_references(document_id);
 CREATE INDEX IF NOT EXISTS idx_document_references_canonical_id ON document_references(canonical_reference_id);
 CREATE INDEX IF NOT EXISTS idx_canonical_references_doi ON canonical_references(doi);
-CREATE INDEX IF NOT EXISTS idx_canonical_references_arxiv_id ON canonical_references(arxiv_id);
 CREATE INDEX IF NOT EXISTS idx_user_plans_user_id ON user_plans(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_usage_user_id ON user_usage(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_feedback_reference_id ON audit_feedback(document_reference_id);
+
+-- Create external_id index only if the column exists
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns 
+             WHERE table_name='canonical_references' AND column_name='external_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_canonical_references_external_id ON canonical_references(external_id);
+  END IF;
+END $$;
 
 -- Row Level Security (RLS) Policies
 

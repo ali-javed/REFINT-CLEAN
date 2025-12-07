@@ -156,7 +156,7 @@ export interface Database {
           id: string;
           doi: string | null;
           pmid: string | null;
-          arxiv_id: string | null;
+          external_id: string | null;
           title: string;
           authors: string[];
           publication_year: number | null;
@@ -171,7 +171,7 @@ export interface Database {
           id?: string;
           doi?: string | null;
           pmid?: string | null;
-          arxiv_id?: string | null;
+          external_id?: string | null;
           title: string;
           authors?: string[];
           publication_year?: number | null;
@@ -186,7 +186,7 @@ export interface Database {
           id?: string;
           doi?: string | null;
           pmid?: string | null;
-          arxiv_id?: string | null;
+          external_id?: string | null;
           title?: string;
           authors?: string[];
           publication_year?: number | null;
