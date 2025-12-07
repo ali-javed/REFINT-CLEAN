@@ -157,9 +157,7 @@ export async function updateDocumentStatus(
     .from('documents')
     .update({
       status,
-      overall_integrity_score: overallIntegrityScore ?? undefined,
-      updated_at: new Date().toISOString(),
-    } as any)
+    })
     .eq('id', documentId)
     .select()
     .single();
@@ -368,42 +366,11 @@ export async function getOrCreateAnonSession(clientToken?: string) {
 
 /**
  * Calculate and update overall integrity score for a document
+ * Simplified: Skip since integrity_score column doesn't exist
  */
 export async function calculateDocumentIntegrityScore(documentId: string) {
-  const supabase = getSupabaseServiceClient();
-
-  // Get all references with integrity scores
-  const { data: references, error } = await supabase
-    .from('document_references')
-    .select('integrity_score')
-    .eq('document_id', documentId)
-    .not('integrity_score', 'is', null);
-
-  if (error) {
-    throw new Error(`Failed to fetch references for score calculation: ${error.message}`);
-  }
-
-  if (!references || references.length === 0) {
-    return null;
-  }
-
-  // Calculate average integrity score
-  const scores = (references as any[])
-    .map((ref: any) => ref.integrity_score)
-    .filter((score): score is number => score !== null);
-
-  const averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-
-  // Update document with calculated score
-  await supabase
-    .from('documents')
-    .update({
-      overall_integrity_score: Math.round(averageScore * 100) / 100, // Round to 2 decimal places
-      updated_at: new Date().toISOString(),
-    } as any)
-    .eq('id', documentId);
-
-  return averageScore;
+  // Skip - integrity_score column doesn't exist in simplified schema
+  return null;
 }
 
 /**
