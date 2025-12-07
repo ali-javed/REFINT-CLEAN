@@ -208,24 +208,43 @@ CREATE TABLE IF NOT EXISTS audit_feedback (
   CHECK (user_id IS NOT NULL OR anon_session_id IS NOT NULL)
 );
 
--- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
-CREATE INDEX IF NOT EXISTS idx_documents_anon_session_id ON documents(anon_session_id);
-CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
-CREATE INDEX IF NOT EXISTS idx_document_references_document_id ON document_references(document_id);
-CREATE INDEX IF NOT EXISTS idx_document_references_canonical_id ON document_references(canonical_reference_id);
-CREATE INDEX IF NOT EXISTS idx_canonical_references_doi ON canonical_references(doi);
-CREATE INDEX IF NOT EXISTS idx_user_plans_user_id ON user_plans(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_usage_user_id ON user_usage(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_feedback_reference_id ON audit_feedback(document_reference_id);
-
--- Create external_id index only if the column exists
+-- Create indexes for better query performance (wrapped to handle missing columns)
 DO $$ 
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns 
-             WHERE table_name='canonical_references' AND column_name='external_id') THEN
+  -- Documents indexes
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='user_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='anon_session_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_documents_anon_session_id ON documents(anon_session_id);
+  END IF;
+  
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='status') THEN
+    CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+  END IF;
+  
+  -- Document references indexes
+  CREATE INDEX IF NOT EXISTS idx_document_references_document_id ON document_references(document_id);
+  CREATE INDEX IF NOT EXISTS idx_document_references_canonical_id ON document_references(canonical_reference_id);
+  
+  -- Canonical references indexes
+  CREATE INDEX IF NOT EXISTS idx_canonical_references_doi ON canonical_references(doi);
+  
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='canonical_references' AND column_name='external_id') THEN
     CREATE INDEX IF NOT EXISTS idx_canonical_references_external_id ON canonical_references(external_id);
   END IF;
+  
+  -- User plans index
+  CREATE INDEX IF NOT EXISTS idx_user_plans_user_id ON user_plans(user_id);
+  
+  -- User usage indexes
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='user_usage' AND column_name='user_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_user_usage_user_id ON user_usage(user_id);
+  END IF;
+  
+  -- Audit feedback index
+  CREATE INDEX IF NOT EXISTS idx_audit_feedback_reference_id ON audit_feedback(document_reference_id);
 END $$;
 
 -- Row Level Security (RLS) Policies
@@ -288,91 +307,108 @@ EXCEPTION
   WHEN OTHERS THEN NULL; -- Ignore errors if policies don't exist
 END $$;
 
--- Profiles: Users can read and update their own profile
-CREATE POLICY "Users can view own profile" ON profiles
-  FOR SELECT USING (auth.uid() = id);
+-- Create all policies (wrapped to ensure columns exist)
+DO $$ 
+BEGIN
+  -- Profiles: Users can read and update their own profile
+  CREATE POLICY "Users can view own profile" ON profiles
+    FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Users can update own profile" ON profiles
-  FOR UPDATE USING (auth.uid() = id);
+  CREATE POLICY "Users can update own profile" ON profiles
+    FOR UPDATE USING (auth.uid() = id);
 
--- User Plans: Users can view their own plan
-CREATE POLICY "Users can view own plan" ON user_plans
-  FOR SELECT USING (auth.uid() = user_id);
+  -- User Plans: Users can view their own plan
+  CREATE POLICY "Users can view own plan" ON user_plans
+    FOR SELECT USING (auth.uid() = user_id);
 
--- Documents: Users can view and create their own documents
-CREATE POLICY "Users can view own documents" ON documents
-  FOR SELECT USING (auth.uid() = user_id);
+  -- Documents: Only create if user_id column exists
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='user_id') THEN
+    CREATE POLICY "Users can view own documents" ON documents
+      FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can create own documents" ON documents
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+    CREATE POLICY "Users can create own documents" ON documents
+      FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Users can update own documents" ON documents
-  FOR UPDATE USING (auth.uid() = user_id);
+    CREATE POLICY "Users can update own documents" ON documents
+      FOR UPDATE USING (auth.uid() = user_id);
+  END IF;
 
--- Anonymous users can view and create documents with their session
-CREATE POLICY "Anon users can view session documents" ON documents
-  FOR SELECT USING (anon_session_id IS NOT NULL);
+  -- Anonymous users can view and create documents with their session
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='anon_session_id') THEN
+    CREATE POLICY "Anon users can view session documents" ON documents
+      FOR SELECT USING (anon_session_id IS NOT NULL);
 
-CREATE POLICY "Anon users can create session documents" ON documents
-  FOR INSERT WITH CHECK (anon_session_id IS NOT NULL);
+    CREATE POLICY "Anon users can create session documents" ON documents
+      FOR INSERT WITH CHECK (anon_session_id IS NOT NULL);
+  END IF;
 
--- Document References: Users can view references from their documents
-CREATE POLICY "Users can view own document references" ON document_references
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM documents 
-      WHERE documents.id = document_references.document_id 
-      AND documents.user_id = auth.uid()
-    )
-  );
+  -- Document References: Users can view references from their documents
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='user_id') THEN
+    CREATE POLICY "Users can view own document references" ON document_references
+      FOR SELECT USING (
+        EXISTS (
+          SELECT 1 FROM documents 
+          WHERE documents.id = document_references.document_id 
+          AND documents.user_id = auth.uid()
+        )
+      );
 
-CREATE POLICY "Users can create document references" ON document_references
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM documents 
-      WHERE documents.id = document_references.document_id 
-      AND documents.user_id = auth.uid()
-    )
-  );
+    CREATE POLICY "Users can create document references" ON document_references
+      FOR INSERT WITH CHECK (
+        EXISTS (
+          SELECT 1 FROM documents 
+          WHERE documents.id = document_references.document_id 
+          AND documents.user_id = auth.uid()
+        )
+      );
 
-CREATE POLICY "Users can update own document references" ON document_references
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM documents 
-      WHERE documents.id = document_references.document_id 
-      AND documents.user_id = auth.uid()
-    )
-  );
+    CREATE POLICY "Users can update own document references" ON document_references
+      FOR UPDATE USING (
+        EXISTS (
+          SELECT 1 FROM documents 
+          WHERE documents.id = document_references.document_id 
+          AND documents.user_id = auth.uid()
+        )
+      );
+  END IF;
 
--- Anon users can view references from their session documents
-CREATE POLICY "Anon users can view session document references" ON document_references
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM documents 
-      WHERE documents.id = document_references.document_id 
-      AND documents.anon_session_id IS NOT NULL
-    )
-  );
+  -- Anon users can view references from their session documents
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documents' AND column_name='anon_session_id') THEN
+    CREATE POLICY "Anon users can view session document references" ON document_references
+      FOR SELECT USING (
+        EXISTS (
+          SELECT 1 FROM documents 
+          WHERE documents.id = document_references.document_id 
+          AND documents.anon_session_id IS NOT NULL
+        )
+      );
 
-CREATE POLICY "Anon users can create session document references" ON document_references
-  FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM documents 
-      WHERE documents.id = document_references.document_id 
-      AND documents.anon_session_id IS NOT NULL
-    )
-  );
+    CREATE POLICY "Anon users can create session document references" ON document_references
+      FOR INSERT WITH CHECK (
+        EXISTS (
+          SELECT 1 FROM documents 
+          WHERE documents.id = document_references.document_id 
+          AND documents.anon_session_id IS NOT NULL
+        )
+      );
+  END IF;
 
--- Canonical References: Public read access
-CREATE POLICY "Anyone can read canonical references" ON canonical_references
-  FOR SELECT USING (true);
+  -- Canonical References: Public read access
+  CREATE POLICY "Anyone can read canonical references" ON canonical_references
+    FOR SELECT USING (true);
 
--- Audit Feedback: Users can create and view their own feedback
-CREATE POLICY "Users can view own feedback" ON audit_feedback
-  FOR SELECT USING (auth.uid() = user_id);
+  -- Audit Feedback: Users can create and view their own feedback
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='audit_feedback' AND column_name='user_id') THEN
+    CREATE POLICY "Users can view own feedback" ON audit_feedback
+      FOR SELECT USING (auth.uid() = user_id);
 
-CREATE POLICY "Users can create feedback" ON audit_feedback
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+    CREATE POLICY "Users can create feedback" ON audit_feedback
+      FOR INSERT WITH CHECK (auth.uid() = user_id);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN 
+    RAISE NOTICE 'Policy creation error: %', SQLERRM;
+END $$;
 
 -- Functions to automatically update updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
