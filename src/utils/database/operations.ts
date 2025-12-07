@@ -183,7 +183,7 @@ export async function createDocumentReferences(
     publication: ref.publication || null,
   }));
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('document_references')
     .insert(referencesData)
     .select();
@@ -270,7 +270,7 @@ export async function createAuditFeedback(params: {
     user_id: params.userId || null,
   };
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('audit_feedback')
     .insert(feedbackData as any)
     .select()
@@ -353,7 +353,7 @@ export async function createProcessingJob(
 ) {
   const supabase = getSupabaseServiceClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('processing_jobs')
     .insert({
       document_id: documentId,
@@ -418,7 +418,7 @@ export async function logUserAction(params: {
 }) {
   const supabase = getSupabaseServiceClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('user_usage')
     .insert({
       document_id: params.documentId,
