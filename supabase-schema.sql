@@ -125,18 +125,55 @@ BEGIN
   END IF;
 END $$;
 
--- 6. Document References table (SIMPLIFIED - only essential columns)
-CREATE TABLE document_references (
+-- 6. Document References table
+-- Note: Start with minimal columns, add others as needed via migrations
+CREATE TABLE IF NOT EXISTS document_references (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
   raw_citation_text TEXT NOT NULL,
   context_before TEXT,
   context_after TEXT,
+  position_in_doc INTEGER,
+  parsed_title TEXT,
+  parsed_authors TEXT[],
+  parsed_year INTEGER,
+  claim_text TEXT,
+  integrity_score NUMERIC(5,2),
+  integrity_explanation TEXT,
+  match_status TEXT,
+  canonical_reference_id UUID REFERENCES canonical_references(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- No additional column migrations needed for simplified schema
+-- Add columns to documents table that may be needed
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='file_size') THEN
+    ALTER TABLE documents ADD COLUMN file_size INTEGER;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='mime_type') THEN
+    ALTER TABLE documents ADD COLUMN mime_type TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='storage_path') THEN
+    ALTER TABLE documents ADD COLUMN storage_path TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='overall_integrity_score') THEN
+    ALTER TABLE documents ADD COLUMN overall_integrity_score NUMERIC(5,2);
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='total_references') THEN
+    ALTER TABLE documents ADD COLUMN total_references INTEGER DEFAULT 0;
+  END IF;
+END $$;
 
 -- 7. Processing Jobs table (for background tasks)
 CREATE TABLE IF NOT EXISTS processing_jobs (
