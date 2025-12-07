@@ -439,10 +439,12 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
             
             if (existenceResponse.ok) {
               const data = await existenceResponse.json();
-              const content = data.choices?.[0]?.message?.content;
+              let content = data.choices?.[0]?.message?.content;
               
               if (content) {
                 try {
+                  // Remove code block markers if present
+                  content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
                   const result = JSON.parse(content);
                   existenceScore = Math.max(0, Math.min(100, result.score || 50));
                   existenceCheck = result.explanation || 'Existence check completed';
@@ -495,10 +497,12 @@ Respond with a JSON object: {"score": <number 0-100>, "comments": "<2-3 sentence
               
               if (contextResponse.ok) {
                 const data = await contextResponse.json();
-                const content = data.choices?.[0]?.message?.content;
+                let content = data.choices?.[0]?.message?.content;
                 
                 if (content) {
                   try {
+                    // Remove code block markers if present
+                    content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
                     const result = JSON.parse(content);
                     contextIntegrityScore = Math.max(0, Math.min(100, result.score || 50));
                     contextIntegrityReview = result.comments || 'Context integrity check completed';
