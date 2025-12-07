@@ -427,6 +427,7 @@ export default function HomePage() {
                 <li>• Full unblurred reports</li>
                 <li>• Exportable integrity PDFs</li>
                 <li>• Priority model & updates</li>
+                <li>• <span className="font-semibold text-indigo-300">Human-in-the-loop:</span> Get your document validated and certified by experts from top academic institutions</li>
               </ul>
               <button className="mt-6 w-full rounded-full bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400">
                 Sign up to start free trial
