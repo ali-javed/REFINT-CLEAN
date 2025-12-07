@@ -32,6 +32,35 @@ CREATE TABLE IF NOT EXISTS user_plans (
   UNIQUE(user_id)
 );
 
+-- Add missing columns to user_plans if they don't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='user_plans' AND column_name='user_id') THEN
+    ALTER TABLE user_plans ADD COLUMN user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='user_plans' AND column_name='stripe_customer_id') THEN
+    ALTER TABLE user_plans ADD COLUMN stripe_customer_id TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='user_plans' AND column_name='stripe_subscription_id') THEN
+    ALTER TABLE user_plans ADD COLUMN stripe_subscription_id TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='user_plans' AND column_name='monthly_limit') THEN
+    ALTER TABLE user_plans ADD COLUMN monthly_limit INTEGER NOT NULL DEFAULT 3;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='user_plans' AND column_name='monthly_used') THEN
+    ALTER TABLE user_plans ADD COLUMN monthly_used INTEGER DEFAULT 0;
+  END IF;
+END $$;
+
 -- 3. Anonymous Sessions table
 CREATE TABLE IF NOT EXISTS anon_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
