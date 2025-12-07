@@ -17,6 +17,9 @@ export default function DashboardPage() {
   const [passwordResetSent, setPasswordResetSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [duplicateDocId, setDuplicateDocId] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
 
   const supabase = getBrowserSupabaseClient();
 
@@ -138,7 +141,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, overwrite = false) => {
     setUploading(true);
     setError(null);
     const formData = new FormData();
@@ -147,6 +150,11 @@ export default function DashboardPage() {
     // Add userId if authenticated
     if (session?.user?.id) {
       formData.append('userId', session.user.id);
+    }
+    
+    // Add overwrite flag if this is a retry
+    if (overwrite) {
+      formData.append('overwrite', 'true');
     }
 
     try {
@@ -157,11 +165,25 @@ export default function DashboardPage() {
 
       const json = await res.json();
 
+      // Handle duplicate detection (409 status)
+      if (res.status === 409 && json.isDuplicate) {
+        setDuplicateDocId(json.documentId);
+        setPendingFile(file);
+        setDuplicateMessage(json.message);
+        setUploading(false);
+        return;
+      }
+
       if (!res.ok) {
         console.error('Upload error:', json);
         setError(json.error || json.message || 'Upload failed');
         return;
       }
+
+      // Clear duplicate state on success
+      setDuplicateDocId(null);
+      setPendingFile(null);
+      setDuplicateMessage(null);
 
       if (json.documentId) {
         // Refetch documents to show the new one
@@ -184,6 +206,19 @@ export default function DashboardPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleOverwriteYes = () => {
+    if (pendingFile) {
+      handleUpload(pendingFile, true);
+    }
+  };
+
+  const handleOverwriteNo = () => {
+    setDuplicateDocId(null);
+    setPendingFile(null);
+    setDuplicateMessage(null);
+    setError(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -252,22 +287,49 @@ export default function DashboardPage() {
                 <p className="text-sm text-red-400">{error}</p>
               </div>
             )}
-            <label htmlFor="dashboard-upload" className="cursor-pointer">
-              <input
-                id="dashboard-upload"
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleUpload(file);
-                }}
-              />
-              <span className="inline-block rounded-full bg-violet-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-violet-500 disabled:opacity-50">
-                {uploading ? '⏳ Processing...' : '📄 Upload Document'}
-              </span>
-            </label>
+            
+            {duplicateDocId ? (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="mb-3">
+                  <p className="text-sm font-medium text-amber-300 mb-1">⚠️ Duplicate File Detected</p>
+                  <p className="text-xs text-zinc-400">{duplicateMessage}</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleOverwriteNo}
+                    className="flex-1 inline-flex items-center justify-center rounded-lg border border-zinc-600 bg-zinc-800 text-zinc-200 text-sm font-medium px-4 py-2.5 hover:bg-zinc-700 transition"
+                  >
+                    No, Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleOverwriteYes}
+                    disabled={uploading}
+                    className="flex-1 inline-flex items-center justify-center rounded-lg border border-amber-600 bg-amber-600 text-white text-sm font-medium px-4 py-2.5 hover:bg-amber-700 disabled:opacity-50 transition"
+                  >
+                    {uploading ? '⏳ Processing...' : 'Yes, Overwrite'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label htmlFor="dashboard-upload" className="cursor-pointer">
+                <input
+                  id="dashboard-upload"
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUpload(file);
+                  }}
+                />
+                <span className="inline-block rounded-full bg-violet-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-violet-500 disabled:opacity-50">
+                  {uploading ? '⏳ Processing...' : '📄 Upload Document'}
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Plan Card */}
