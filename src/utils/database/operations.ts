@@ -127,6 +127,43 @@ export async function createDocument(params: {
 
   console.log('[createDocument] Inserting document:', JSON.stringify(documentInsert, null, 2));
 
+  // Try direct HTTP request to bypass client cache
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (supabaseUrl && serviceKey) {
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/documents?select=*`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify(documentInsert),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[createDocument] Direct insert successful:', data);
+        
+        // Increment upload count for anon sessions
+        if (params.anonSessionId) {
+          await incrementAnonSessionUploads(params.anonSessionId);
+        }
+        
+        return (Array.isArray(data) ? data[0] : data) as Document;
+      } else {
+        const errorText = await response.text();
+        console.error('[createDocument] Direct insert failed:', response.status, errorText);
+      }
+    } catch (fetchError) {
+      console.error('[createDocument] Direct fetch failed:', fetchError);
+    }
+  }
+
+  // Fallback to Supabase client
   const { data, error } = await supabase
     .from('documents')
     .insert(documentInsert)
