@@ -114,22 +114,22 @@ export async function createDocument(params: {
     throw new Error('Either userId or anonSessionId must be provided');
   }
 
-  const documentData = {
-    filename: params.filename,
-    file_size: params.fileSize,
-    mime_type: params.mimeType,
-    storage_path: params.storagePath || null,
-    user_id: params.userId || null,
-    anon_session_id: params.anonSessionId || null,
-    status: 'uploaded' as const,
-    total_references: 0,
-  };
+  // Use exact snake_case column names as they appear in database
+  const documentInsert: any = {};
+  documentInsert.filename = params.filename;
+  documentInsert.file_size = params.fileSize;
+  documentInsert.mime_type = params.mimeType;
+  documentInsert.storage_path = params.storagePath || null;
+  documentInsert.user_id = params.userId || null;
+  documentInsert.anon_session_id = params.anonSessionId || null;
+  documentInsert.status = 'uploaded';
+  documentInsert.total_references = 0;
 
-  console.log('[createDocument] Inserting document:', JSON.stringify(documentData, null, 2));
+  console.log('[createDocument] Inserting document:', JSON.stringify(documentInsert, null, 2));
 
   const { data, error } = await supabase
     .from('documents')
-    .insert(documentData)
+    .insert(documentInsert)
     .select()
     .single();
 
