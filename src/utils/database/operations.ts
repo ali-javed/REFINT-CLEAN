@@ -107,30 +107,34 @@ export async function createDocument(params: {
   userId?: string;
   anonSessionId?: string;
 }) {
+  // Use service role client to bypass RLS and ensure schema access
   const supabase = getSupabaseClient();
 
   if (!params.userId && !params.anonSessionId) {
     throw new Error('Either userId or anonSessionId must be provided');
   }
 
-  const documentData: DocumentInsert = {
+  const documentData = {
     filename: params.filename,
     file_size: params.fileSize,
     mime_type: params.mimeType,
     storage_path: params.storagePath || null,
     user_id: params.userId || null,
     anon_session_id: params.anonSessionId || null,
-    status: 'uploaded',
+    status: 'uploaded' as const,
     total_references: 0,
   };
 
+  console.log('[createDocument] Inserting document:', JSON.stringify(documentData, null, 2));
+
   const { data, error } = await supabase
     .from('documents')
-    .insert(documentData as any)
+    .insert(documentData)
     .select()
     .single();
 
   if (error) {
+    console.error('[createDocument] Error details:', JSON.stringify(error, null, 2));
     throw new Error(`Failed to create document: ${error.message}`);
   }
 
