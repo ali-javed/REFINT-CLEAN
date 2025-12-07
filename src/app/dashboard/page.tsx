@@ -399,6 +399,9 @@ export default function DashboardPage() {
                           {doc.status}
                         </span>
                       </div>
+                      {doc.title && (
+                        <p className="text-sm text-zinc-400 mb-2">📄 {doc.title}</p>
+                      )}
                       
                       {/* Integrity Score */}
                       {doc.overall_integrity_score !== null && (
@@ -493,17 +496,6 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {profile?.is_edu_verified && (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
-                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  .edu Verified
-                </span>
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-zinc-400">Account Created</label>
               <p className="mt-1 text-zinc-100">
@@ -530,26 +522,14 @@ export default function DashboardPage() {
                   {userPlan.plan_type === 'free' && '📄'}
                   {userPlan.plan_type.charAt(0).toUpperCase() + userPlan.plan_type.slice(1)}
                 </span>
-                {userPlan.is_active ? (
-                  <span className="text-xs text-emerald-400">Active</span>
-                ) : (
-                  <span className="text-xs text-red-400">Inactive</span>
-                )}
+                <span className="text-xs text-emerald-400">Active</span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400">Period Start</label>
-                  <p className="mt-1 text-sm text-zinc-100">
-                    {new Date(userPlan.period_start).toLocaleDateString()}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400">Period End</label>
-                  <p className="mt-1 text-sm text-zinc-100">
-                    {new Date(userPlan.period_end).toLocaleDateString()}
-                  </p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-400">Account Created</label>
+                <p className="mt-1 text-sm text-zinc-100">
+                  {new Date(userPlan.created_at).toLocaleDateString()}
+                </p>
               </div>
             </div>
           </div>

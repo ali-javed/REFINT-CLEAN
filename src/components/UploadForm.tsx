@@ -5,10 +5,9 @@ import { useRouter } from 'next/navigation';
 
 interface UploadFormProps {
   userId?: string;
-  anonSessionId?: string;
 }
 
-export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
+export default function UploadForm({ userId }: UploadFormProps) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,11 +32,9 @@ export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
     const formData = new FormData();
     formData.append('file', file);
     
-    // Add user ID or anon session ID
+    // Add user ID (required)
     if (userId) {
       formData.append('userId', userId);
-    } else if (anonSessionId) {
-      formData.append('anonSessionId', anonSessionId);
     }
     
     // Add overwrite flag if this is a retry

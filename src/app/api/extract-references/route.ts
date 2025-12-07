@@ -6,9 +6,7 @@ import {
   createDocument, 
   createDocumentReferences, 
   updateDocumentStatus, 
-  calculateDocumentIntegrityScore,
-  createAnonSession,
-  getAnonSessionByToken
+  calculateDocumentIntegrityScore
 } from '@/utils/database/operations';
 
 interface ReferenceWithContext {
@@ -306,8 +304,7 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    let userId = formData.get('userId') as string | null;
-    let anonSessionId = formData.get('anonSessionId') as string | null;
+    const userId = formData.get('userId') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -323,33 +320,16 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Ensure we have either userId or anonSessionId
-    if (!userId && !anonSessionId) {
+    // Require userId
+    if (!userId) {
       return NextResponse.json(
-        { error: 'Either userId or anonSessionId must be provided' },
-        { status: 400 }
+        { error: 'User ID is required. Please sign in.' },
+        { status: 401 }
       );
-    }
-    
-    // If anonSessionId is provided but doesn't exist in DB, create it
-    if (anonSessionId && !userId) {
-      try {
-        const existingSession = await getAnonSessionByToken(anonSessionId);
-        if (!existingSession) {
-          const newSession = await createAnonSession(anonSessionId);
-          console.log(`[extract-references] Created new anon session: ${newSession.id}`);
-        }
-      } catch (err) {
-        console.error('[extract-references] Failed to create anon session:', err);
-        return NextResponse.json(
-          { error: 'Failed to create anonymous session' },
-          { status: 500 }
-        );
-      }
     }
 
     console.log(`[extract-references] File received: ${file.name}, size: ${file.size} bytes`);
-    console.log(`[extract-references] userId: ${userId}, anonSessionId: ${anonSessionId}`);
+    console.log(`[extract-references] userId: ${userId}`);
     
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -362,10 +342,7 @@ export async function POST(req: NextRequest) {
     // 1) Create document record in database (check for duplicates)
     const document = await createDocument({
       filename: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-      userId: userId || undefined,
-      anonSessionId: anonSessionId || undefined,
+      userId: userId,
       overwrite,
     }) as any;
 

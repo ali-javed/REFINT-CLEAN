@@ -63,9 +63,9 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
   // Then get the document references
   const { data, error } = await supabase
     .from('document_references')
-    .select('id, raw_citation_text, context_before, context_after, created_at')
+    .select('id, raw_citation_text, first_author, second_author, last_author, year, publication, context_before, context_after, integrity_score, ai_review, position_in_doc, created_at')
     .eq('document_id', documentId)
-    .order('created_at', { ascending: true });
+    .order('position_in_doc', { ascending: true, nullsFirst: false });
 
   if (error) {
     console.error('Error loading references:', error);
@@ -82,10 +82,15 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
   const refs = (data ?? []).map((ref: any) => ({
     id: ref.id,
     raw_reference: ref.raw_citation_text,
+    first_author: ref.first_author,
+    second_author: ref.second_author,
+    last_author: ref.last_author,
+    year: ref.year,
+    publication: ref.publication,
     context_before: ref.context_before,
     context_after: ref.context_after,
-    integrity_score: null,
-    integrity_explanation: null,
+    integrity_score: ref.integrity_score,
+    integrity_explanation: ref.ai_review,
     match_status: null,
     created_at: ref.created_at,
   }));
@@ -100,6 +105,9 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold mb-2">{doc.filename}</h1>
+              {doc.title && (
+                <p className="text-base text-zinc-300 mb-2">📄 {doc.title}</p>
+              )}
               <p className="text-sm text-zinc-400">
                 Uploaded on {new Date(doc.created_at).toLocaleDateString('en-US', {
                   year: 'numeric',
@@ -150,6 +158,16 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
             </div>
           </div>
         </div>
+
+        {/* AI Review Report */}
+        {doc.ai_review_report && (
+          <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+            <h2 className="text-xl font-semibold mb-3">AI Review Report</h2>
+            <div className="prose prose-invert prose-sm max-w-none">
+              <p className="text-zinc-300 whitespace-pre-wrap">{doc.ai_review_report}</p>
+            </div>
+          </div>
+        )}
 
         {/* References List */}
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">

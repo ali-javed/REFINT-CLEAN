@@ -22,102 +22,22 @@ import type {
 } from '@/types/database';
 import { randomUUID } from 'crypto';
 
-/**
- * Create an anonymous session with a unique client token
- */
-export async function createAnonSession(clientToken?: string) {
-  const supabase = getSupabaseServiceClient();
-  
-  const sessionData: AnonSessionInsert = {
-    client_token: clientToken || randomUUID(),
-    documents_uploaded: 0,
-  };
-
-  const { data, error } = await supabase
-    .from('anon_sessions')
-    .insert(sessionData as any)
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to create anon session: ${error.message}`);
-  }
-
-  return data as AnonSession;
-}
+// Anonymous session functions removed - using user_id only in fresh schema
 
 /**
- * Get an anonymous session by client token
- */
-export async function getAnonSessionByToken(clientToken: string) {
-  const supabase = getSupabaseServiceClient();
-
-  const { data, error } = await supabase
-    .from('anon_sessions')
-    .select()
-    .eq('client_token', clientToken)
-    .single();
-
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116 is "not found" error, which is acceptable
-    throw new Error(`Failed to get anon session: ${error.message}`);
-  }
-
-  return data;
-}
-
-/**
- * Increment document upload count for an anonymous session
- */
-export async function incrementAnonSessionUploads(anonSessionId: string) {
-  const supabase = getSupabaseServiceClient();
-
-  // Fetch current count and increment
-  const { data: session } = await supabase
-    .from('anon_sessions')
-    .select('documents_uploaded')
-    .eq('id', anonSessionId)
-    .single();
-
-  const { data, error } = await supabase
-    .from('anon_sessions')
-    .update({
-      documents_uploaded: (session?.documents_uploaded || 0) + 1,
-      last_activity: new Date().toISOString(),
-    } as any)
-    .eq('id', anonSessionId)
-    .select()
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to increment anon session uploads: ${error.message}`);
-  }
-
-  return data as AnonSession;
-}
-
-/**
- * Check if document with same filename exists for user/session
+ * Check if document with same filename exists for user
  */
 export async function findExistingDocument(params: {
   filename: string;
-  userId?: string;
-  anonSessionId?: string;
+  userId: string;
 }) {
   const supabase = getSupabaseServiceClient();
   
-  let query = supabase
+  const { data, error } = await supabase
     .from('documents')
     .select('*')
-    .eq('filename', params.filename);
-  
-  if (params.userId) {
-    query = query.eq('user_id', params.userId);
-  } else if (params.anonSessionId) {
-    query = query.eq('anon_session_id', params.anonSessionId);
-  }
-  
-  const { data, error } = await query;
+    .eq('filename', params.filename)
+    .eq('user_id', params.userId);
   
   if (error) {
     console.error('[findExistingDocument] Error:', error);
@@ -151,29 +71,24 @@ export async function deleteDocument(documentId: string) {
 }
 
 /**
- * Upload a document record linked to either user_id or anon_session_id
+ * Upload a document record linked to user_id
  */
 export async function createDocument(params: {
   filename: string;
-  fileSize: number;
-  mimeType: string;
-  storagePath?: string;
-  userId?: string;
-  anonSessionId?: string;
+  userId: string;
   overwrite?: boolean;
 }) {
   // Use service role client to bypass RLS and ensure schema access
   const supabase = getSupabaseServiceClient();
 
-  if (!params.userId && !params.anonSessionId) {
-    throw new Error('Either userId or anonSessionId must be provided');
+  if (!params.userId) {
+    throw new Error('userId is required');
   }
 
   // Check for existing document
   const existing = await findExistingDocument({
     filename: params.filename,
     userId: params.userId,
-    anonSessionId: params.anonSessionId,
   });
 
   if (existing) {
@@ -189,15 +104,14 @@ export async function createDocument(params: {
     }
   }
 
-  // Simplified insert - only use columns that definitely exist in cache
+  // Insert new document
   const documentInsert: any = {
     filename: params.filename,
-    user_id: params.userId || null,
-    anon_session_id: params.anonSessionId || null,
+    user_id: params.userId,
     status: 'uploaded',
   };
 
-  console.log('[createDocument] Inserting document (simplified):', JSON.stringify(documentInsert, null, 2));
+  console.log('[createDocument] Inserting document:', JSON.stringify(documentInsert, null, 2));
 
   const { data, error } = await supabase
     .from('documents')
@@ -211,11 +125,6 @@ export async function createDocument(params: {
 
   if (!data || data.length === 0) {
     throw new Error('Failed to create document: No data returned');
-  }
-
-  // Increment upload count for anon sessions
-  if (params.anonSessionId) {
-    await incrementAnonSessionUploads(params.anonSessionId);
   }
 
   return data[0] as Document;
@@ -254,12 +163,13 @@ export async function createDocumentReferences(
   documentId: string,
   references: Array<{
     rawCitationText: string;
-    parsedTitle?: string;
-    parsedAuthors?: string[];
-    parsedYear?: number;
+    firstAuthor?: string;
+    secondAuthor?: string;
+    lastAuthor?: string;
+    year?: number;
+    publication?: string;
     contextBefore?: string;
     contextAfter?: string;
-    claimText?: string;
     positionInDoc?: number;
   }>
 ) {
@@ -272,10 +182,11 @@ export async function createDocumentReferences(
     context_before: ref.contextBefore || null,
     context_after: ref.contextAfter || null,
     position_in_doc: ref.positionInDoc ?? null,
-    parsed_title: ref.parsedTitle || null,
-    parsed_authors: ref.parsedAuthors || null,
-    parsed_year: ref.parsedYear || null,
-    claim_text: ref.claimText || null,
+    first_author: ref.firstAuthor || null,
+    second_author: ref.secondAuthor || null,
+    last_author: ref.lastAuthor || null,
+    year: ref.year || null,
+    publication: ref.publication || null,
   }));
 
   const { data, error } = await supabase
