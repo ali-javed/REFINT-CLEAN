@@ -367,7 +367,7 @@ export async function createProcessingJob(
     throw new Error(`Failed to create processing job: ${error.message}`);
   }
 
-  return data as ProcessingJob;
+  return data as any;
 }
 
 /**
@@ -404,7 +404,7 @@ export async function updateProcessingJobStatus(
     throw new Error(`Failed to update processing job: ${error.message}`);
   }
 
-  return data as ProcessingJob;
+  return data as any;
 }
 
 /**
@@ -433,5 +433,5 @@ export async function logUserAction(params: {
     throw new Error(`Failed to log user action: ${error.message}`);
   }
 
-  return data as UserUsage;
+  return data as any;
 }
