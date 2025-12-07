@@ -1,4 +1,4 @@
-import { getSupabaseClient } from '@/utils/supabase/server';
+import { getSupabaseServiceClient } from '@/utils/supabase/client';
 import ReferencesList from '@/components/ReferencesList';
 
 type ReferencesPageProps = {
@@ -29,7 +29,7 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
     );
   }
 
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   // First, get the document info
   const { data: documents, error: docError } = await supabase
