@@ -16,10 +16,15 @@ interface ReferenceWithContext {
   context_after: string | null;
 }
 
+interface ExtractionResult {
+  references: ReferenceWithContext[];
+  totalParsed: number;
+}
+
 async function extractReferencesFromPdf(
   buffer: Buffer,
   fileName: string
-): Promise<ReferenceWithContext[]> {
+): Promise<ExtractionResult> {
   // Use unpdf for text extraction (works in Node.js without browser APIs)
   const uint8Array = new Uint8Array(buffer);
   const result = await extractText(uint8Array);
