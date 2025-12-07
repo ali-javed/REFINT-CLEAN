@@ -266,7 +266,6 @@ export async function createAuditFeedback(params: {
   feedbackType: 'accurate' | 'inaccurate' | 'misleading' | 'missing_context';
   comment?: string;
   userId?: string;
-  anonSessionId?: string;
 }) {
   const supabase = getSupabaseServiceClient();
 
@@ -275,7 +274,6 @@ export async function createAuditFeedback(params: {
     feedback_type: params.feedbackType,
     comment: params.comment || null,
     user_id: params.userId || null,
-    anon_session_id: params.anonSessionId || null,
   };
 
   const { data, error } = await supabase

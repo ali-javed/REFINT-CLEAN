@@ -7,7 +7,6 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const documentId = searchParams.get('documentId');
     const userId = searchParams.get('userId');
-    const anonSessionId = searchParams.get('anonSessionId');
 
     if (!documentId) {
       return NextResponse.json(
@@ -16,10 +15,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    if (!userId && !anonSessionId) {
+    if (!userId) {
       return NextResponse.json(
-        { error: 'userId or anonSessionId is required' },
-        { status: 400 }
+        { error: 'userId is required' },
+        { status: 401 }
       );
     }
 
@@ -27,7 +26,7 @@ export async function DELETE(request: NextRequest) {
     const supabase = getSupabaseServiceClient();
     const { data: docs, error: fetchError } = await supabase
       .from('documents')
-      .select('user_id, anon_session_id')
+      .select('user_id')
       .eq('id', documentId);
 
     if (fetchError || !docs || docs.length === 0) {
@@ -40,11 +39,7 @@ export async function DELETE(request: NextRequest) {
     const doc = docs[0] as any;
 
     // Check ownership
-    const isOwner = userId 
-      ? doc.user_id === userId 
-      : doc.anon_session_id === anonSessionId;
-
-    if (!isOwner) {
+    if (doc.user_id !== userId) {
       return NextResponse.json(
         { error: 'Not authorized to delete this document' },
         { status: 403 }

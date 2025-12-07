@@ -6,6 +6,59 @@ import UploadForm from '@/components/UploadForm';
 import Sidebar from '@/components/Sidebar';
 import { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 
+function UserMenu({ userName, userEmail }: { userName: string; userEmail: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const supabase = getBrowserSupabaseClient();
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="rounded-full border border-violet-700 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-300 backdrop-blur-sm transition hover:bg-violet-600/30 flex items-center gap-2"
+      >
+        <span>{userName}</span>
+        <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl z-20">
+            <div className="px-4 py-3 border-b border-zinc-800">
+              <p className="text-sm font-medium text-zinc-100">{userName}</p>
+              <p className="text-xs text-zinc-400 truncate">{userEmail}</p>
+            </div>
+            <div className="py-1">
+              <a
+                href="/dashboard"
+                className="block px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition"
+              >
+                📊 Dashboard
+              </a>
+              <button
+                onClick={handleSignOut}
+                className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-zinc-800 transition"
+              >
+                🚪 Sign Out
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const integrityRanges = [
   { label: '90–100', title: 'Perfectly matched & verified', desc: 'The reference clearly supports the claim and matches the original context.' },
   { label: '70–89', title: 'Minor interpretation drift', desc: 'Mostly accurate but with small stretches or interpretation differences.' },
@@ -49,20 +102,20 @@ export default function HomePage() {
     }
   }, []);
   const [session, setSession] = useState<Session | null>(null);
-  const [anonSessionId, setAnonSessionId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = async (file: File) => {
+    // Require authentication
+    if (!session?.user?.id) {
+      alert('Please sign in to upload documents');
+      window.location.href = '/signin';
+      return;
+    }
+
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
-    
-    // Add user ID or anon session ID
-    if (session?.user?.id) {
-      formData.append('userId', session.user.id);
-    } else if (anonSessionId) {
-      formData.append('anonSessionId', anonSessionId);
-    }
+    formData.append('userId', session.user.id);
 
     try {
       const res = await fetch('/api/extract-references', {
@@ -94,38 +147,10 @@ export default function HomePage() {
     supabase.auth.getSession().then(({ data }) => {
       console.log('[HomePage] Session loaded:', { exists: !!data.session, email: data.session?.user.email });
       setSession(data.session ?? null);
-      
-      // If no user session, create/get anon session
-      if (!data.session) {
-        const storedAnonId = localStorage.getItem('anonSessionId');
-        if (storedAnonId) {
-          setAnonSessionId(storedAnonId);
-        } else {
-          // Generate new anon session ID
-          const newAnonId = crypto.randomUUID();
-          localStorage.setItem('anonSessionId', newAnonId);
-          setAnonSessionId(newAnonId);
-        }
-      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       console.log('[HomePage] Auth state changed:', { event: _event, exists: !!nextSession });
       setSession(nextSession);
-      
-      // Clear anon session if user logs in
-      if (nextSession) {
-        setAnonSessionId(null);
-      } else {
-        // Create anon session if user logs out
-        const storedAnonId = localStorage.getItem('anonSessionId');
-        if (storedAnonId) {
-          setAnonSessionId(storedAnonId);
-        } else {
-          const newAnonId = crypto.randomUUID();
-          localStorage.setItem('anonSessionId', newAnonId);
-          setAnonSessionId(newAnonId);
-        }
-      }
     });
     return () => {
       sub.subscription.unsubscribe();
@@ -159,12 +184,10 @@ export default function HomePage() {
         {/* User Menu - Top Right (when signed in) */}
         {session && (
           <div className="absolute top-4 right-4 z-10">
-            <a
-              href="/dashboard"
-              className="rounded-full border border-violet-700 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-300 backdrop-blur-sm transition hover:bg-violet-600/30"
-            >
-              Dashboard
-            </a>
+            <UserMenu 
+              userName={session.user.email?.split('@')[0] || 'User'} 
+              userEmail={session.user.email || ''}
+            />
           </div>
         )}
 
