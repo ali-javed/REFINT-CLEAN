@@ -134,7 +134,7 @@ export async function updateDocumentStatus(
 ) {
   const supabase = getSupabaseServiceClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('documents')
     .update({
       status,
