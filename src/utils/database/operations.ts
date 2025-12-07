@@ -97,6 +97,60 @@ export async function incrementAnonSessionUploads(anonSessionId: string) {
 }
 
 /**
+ * Check if document with same filename exists for user/session
+ */
+export async function findExistingDocument(params: {
+  filename: string;
+  userId?: string;
+  anonSessionId?: string;
+}) {
+  const supabase = getSupabaseServiceClient();
+  
+  let query = supabase
+    .from('documents')
+    .select('*')
+    .eq('filename', params.filename);
+  
+  if (params.userId) {
+    query = query.eq('user_id', params.userId);
+  } else if (params.anonSessionId) {
+    query = query.eq('anon_session_id', params.anonSessionId);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('[findExistingDocument] Error:', error);
+    return null;
+  }
+  
+  return data && data.length > 0 ? data[0] as Document : null;
+}
+
+/**
+ * Delete document and its references
+ */
+export async function deleteDocument(documentId: string) {
+  const supabase = getSupabaseServiceClient();
+  
+  // Delete references first (cascade should handle this, but explicit is safer)
+  await supabase
+    .from('document_references')
+    .delete()
+    .eq('document_id', documentId);
+  
+  // Delete document
+  const { error } = await supabase
+    .from('documents')
+    .delete()
+    .eq('id', documentId);
+  
+  if (error) {
+    throw new Error(`Failed to delete document: ${error.message}`);
+  }
+}
+
+/**
  * Upload a document record linked to either user_id or anon_session_id
  */
 export async function createDocument(params: {
@@ -106,12 +160,33 @@ export async function createDocument(params: {
   storagePath?: string;
   userId?: string;
   anonSessionId?: string;
+  overwrite?: boolean;
 }) {
   // Use service role client to bypass RLS and ensure schema access
   const supabase = getSupabaseServiceClient();
 
   if (!params.userId && !params.anonSessionId) {
     throw new Error('Either userId or anonSessionId must be provided');
+  }
+
+  // Check for existing document
+  const existing = await findExistingDocument({
+    filename: params.filename,
+    userId: params.userId,
+    anonSessionId: params.anonSessionId,
+  });
+
+  if (existing) {
+    if (!params.overwrite) {
+      // Return existing document ID and signal that it exists
+      return {
+        ...existing,
+        isDuplicate: true,
+      } as Document & { isDuplicate: boolean };
+    } else {
+      // Delete existing document and its references
+      await deleteDocument(existing.id);
+    }
   }
 
   // Simplified insert - only use columns that definitely exist in cache
@@ -127,12 +202,15 @@ export async function createDocument(params: {
   const { data, error } = await supabase
     .from('documents')
     .insert(documentInsert)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('[createDocument] Error details:', JSON.stringify(error, null, 2));
     throw new Error(`Failed to create document: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Failed to create document: No data returned');
   }
 
   // Increment upload count for anon sessions
@@ -140,7 +218,7 @@ export async function createDocument(params: {
     await incrementAnonSessionUploads(params.anonSessionId);
   }
 
-  return data as Document;
+  return data[0] as Document;
 }
 
 /**

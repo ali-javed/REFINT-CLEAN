@@ -356,14 +356,30 @@ export async function POST(req: NextRequest) {
     
     console.log(`[extract-references] Buffer created: ${buffer.length} bytes`);
 
-    // 1) Create document record in database
+    // Check for overwrite parameter
+    const overwrite = formData.get('overwrite') === 'true';
+
+    // 1) Create document record in database (check for duplicates)
     const document = await createDocument({
       filename: file.name,
       fileSize: file.size,
       mimeType: file.type,
       userId: userId || undefined,
       anonSessionId: anonSessionId || undefined,
-    });
+      overwrite,
+    }) as any;
+
+    // If duplicate and not overwriting, return existing document
+    if (document.isDuplicate) {
+      return NextResponse.json(
+        {
+          message: 'A document with this filename already exists. Would you like to overwrite it?',
+          documentId: document.id,
+          isDuplicate: true,
+        },
+        { status: 409 }
+      );
+    }
     
     console.log(`[extract-references] Created document record: ${document.id}`);
 

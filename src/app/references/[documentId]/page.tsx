@@ -32,11 +32,10 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
   const supabase = getSupabaseClient();
 
   // First, get the document info
-  const { data: document, error: docError } = await supabase
+  const { data: documents, error: docError } = await supabase
     .from('documents')
     .select('*')
-    .eq('id', documentId)
-    .single();
+    .eq('id', documentId);
 
   if (docError) {
     console.error('Error loading document:', docError);
@@ -48,6 +47,18 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
       </main>
     );
   }
+
+  if (!documents || documents.length === 0) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <p className="text-sm text-red-500">
+          Document not found
+        </p>
+      </main>
+    );
+  }
+
+  const document = documents[0];
 
   // Then get the document references
   const { data, error } = await supabase

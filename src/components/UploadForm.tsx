@@ -13,27 +13,36 @@ export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
   const [status, setStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [duplicateDocId, setDuplicateDocId] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>, overwrite = false) {
     e.preventDefault();
     setStatus(null);
 
     const form = e.currentTarget;
     const fileInput = form.elements.namedItem('file') as HTMLInputElement;
 
-    if (!fileInput.files?.[0]) {
+    const file = overwrite && pendingFile ? pendingFile : fileInput.files?.[0];
+    
+    if (!file) {
       setStatus('Please choose a PDF first.');
       return;
     }
 
     const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
+    formData.append('file', file);
     
     // Add user ID or anon session ID
     if (userId) {
       formData.append('userId', userId);
     } else if (anonSessionId) {
       formData.append('anonSessionId', anonSessionId);
+    }
+    
+    // Add overwrite flag if this is a retry
+    if (overwrite) {
+      formData.append('overwrite', 'true');
     }
 
     try {
@@ -54,6 +63,15 @@ export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
         return;
       }
 
+      // Handle duplicate detection (409 status)
+      if (res.status === 409 && json.isDuplicate) {
+        setDuplicateDocId(json.documentId);
+        setPendingFile(file);
+        setStatus(json.message);
+        setIsLoading(false);
+        return;
+      }
+
       if (!res.ok) {
         const msgParts = [];
         if (json.error) msgParts.push(json.error);
@@ -63,6 +81,10 @@ export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
         console.error('API Error:', json);
         return;
       }
+
+      // Clear duplicate state on success
+      setDuplicateDocId(null);
+      setPendingFile(null);
 
       // Redirect directly to references page
       if (json.documentId) {
@@ -120,6 +142,31 @@ export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
       >
         {isLoading ? 'Verifying…' : 'Verify references'}
       </button>
+
+      {/* Duplicate file actions */}
+      {duplicateDocId && !isLoading && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => router.push(`/references/${duplicateDocId}`)}
+            className="flex-1 inline-flex items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 text-sm font-medium px-4 py-2.5 hover:bg-slate-50 transition"
+          >
+            View existing
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              const form = e.currentTarget.closest('form');
+              if (form) {
+                handleSubmit({ currentTarget: form, preventDefault: () => {} } as any, true);
+              }
+            }}
+            className="flex-1 inline-flex items-center justify-center rounded-full border border-slate-900 bg-slate-900 text-white text-sm font-medium px-4 py-2.5 hover:bg-black transition"
+          >
+            Overwrite
+          </button>
+        </div>
+      )}
 
       {/* Status */}
       {status && (
