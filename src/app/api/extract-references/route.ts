@@ -460,6 +460,8 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
             if (docRef.context_before || docRef.context_after) {
               const context = `${docRef.context_before || ''} [CITATION: ${docRef.raw_citation_text}] ${docRef.context_after || ''}`;
               
+              console.log(`[extract-references] Performing context integrity check for ${docRef.id}`);
+              
               const contextPrompt = `You are an academic paper reviewer. Analyze how this paper is being referenced in context.
 
 Context: ${context}
@@ -503,9 +505,16 @@ Respond with a JSON object: {"score": <number 0-100>, "comments": "<2-3 sentence
                     console.log(`[extract-references] Context integrity for ${docRef.id}: ${contextIntegrityScore}/100`);
                   } catch (parseError) {
                     console.error('[extract-references] Failed to parse context integrity response:', parseError);
+                    console.error('[extract-references] Raw response:', content);
                   }
                 }
+              } else {
+                const errorText = await contextResponse.text();
+                console.error(`[extract-references] Context integrity API error for ${docRef.id}:`, contextResponse.status, errorText);
               }
+            } else {
+              console.log(`[extract-references] Skipping context integrity check for ${docRef.id} - no context available`);
+              console.log(`[extract-references] Context before: ${docRef.context_before ? 'YES' : 'NO'}, Context after: ${docRef.context_after ? 'YES' : 'NO'}`);
             }
             
             // Update the reference with both AI scores
