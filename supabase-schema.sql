@@ -62,6 +62,16 @@ CREATE TABLE IF NOT EXISTS documents (
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='user_id') THEN
+    ALTER TABLE documents ADD COLUMN user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='anon_session_id') THEN
+    ALTER TABLE documents ADD COLUMN anon_session_id UUID REFERENCES anon_sessions(id) ON DELETE CASCADE;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                  WHERE table_name='documents' AND column_name='overall_integrity_score') THEN
     ALTER TABLE documents ADD COLUMN overall_integrity_score NUMERIC(5,2);
   END IF;
@@ -69,6 +79,11 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                  WHERE table_name='documents' AND column_name='total_references') THEN
     ALTER TABLE documents ADD COLUMN total_references INTEGER DEFAULT 0;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='documents' AND column_name='storage_path') THEN
+    ALTER TABLE documents ADD COLUMN storage_path TEXT;
   END IF;
 END $$;
 
