@@ -5,7 +5,7 @@
  * These are safe operations that match the database schema defined in @/types/database.ts
  */
 
-import { getSupabaseClient } from '@/utils/supabase/client';
+import { getSupabaseServiceClient } from '@/utils/supabase/client';
 import type {
   AnonSessionInsert,
   DocumentInsert,
@@ -26,7 +26,7 @@ import { randomUUID } from 'crypto';
  * Create an anonymous session with a unique client token
  */
 export async function createAnonSession(clientToken?: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
   
   const sessionData: AnonSessionInsert = {
     client_token: clientToken || randomUUID(),
@@ -50,7 +50,7 @@ export async function createAnonSession(clientToken?: string) {
  * Get an anonymous session by client token
  */
 export async function getAnonSessionByToken(clientToken: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data, error } = await supabase
     .from('anon_sessions')
@@ -70,7 +70,7 @@ export async function getAnonSessionByToken(clientToken: string) {
  * Increment document upload count for an anonymous session
  */
 export async function incrementAnonSessionUploads(anonSessionId: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   // Fetch current count and increment
   const { data: session } = await supabase
@@ -108,7 +108,7 @@ export async function createDocument(params: {
   anonSessionId?: string;
 }) {
   // Use service role client to bypass RLS and ensure schema access
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   if (!params.userId && !params.anonSessionId) {
     throw new Error('Either userId or anonSessionId must be provided');
@@ -154,7 +154,7 @@ export async function updateDocumentStatus(
   status: 'uploaded' | 'processing' | 'completed' | 'failed',
   overallIntegrityScore?: number
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data, error } = await supabase
     .from('documents')
@@ -190,7 +190,7 @@ export async function createDocumentReferences(
     positionInDoc?: number;
   }>
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const referencesData: DocumentReferenceInsert[] = references.map((ref, index) => ({
     document_id: documentId,
@@ -235,7 +235,7 @@ export async function updateDocumentReferenceIntegrity(
   integrityExplanation: string,
   matchStatus?: 'matched' | 'not_found' | 'ambiguous' | 'error'
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const updateData: DocumentReferenceUpdate = {
     integrity_score: integrityScore,
@@ -269,7 +269,7 @@ export async function batchUpdateReferenceIntegrity(
     matchStatus?: 'matched' | 'not_found' | 'ambiguous' | 'error';
   }>
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   // Note: Supabase doesn't support bulk updates natively, so we do them sequentially
   // For production, consider using a stored procedure
@@ -297,7 +297,7 @@ export async function createAuditFeedback(params: {
   userId?: string;
   anonSessionId?: string;
 }) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const feedbackData: AuditFeedbackInsert = {
     document_reference_id: params.documentReferenceId,
@@ -326,7 +326,7 @@ export async function createAuditFeedback(params: {
 export async function getDocumentReferences(
   documentId: string
 ): Promise<DocumentReferenceWithFeedback[]> {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data: references, error: referencesError } = await supabase
     .from('document_references')
@@ -352,7 +352,7 @@ export async function getDocumentReferences(
  * Get a single document with all its references
  */
 export async function getDocumentWithReferences(documentId: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data: document, error: documentError } = await supabase
     .from('documents')
@@ -393,7 +393,7 @@ export async function getOrCreateAnonSession(clientToken?: string) {
  * Calculate and update overall integrity score for a document
  */
 export async function calculateDocumentIntegrityScore(documentId: string) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   // Get all references with integrity scores
   const { data: references, error } = await supabase
@@ -436,7 +436,7 @@ export async function createProcessingJob(
   documentId: string,
   jobType: 'parse_references' | 'match_canonical' | 'verify_integrity'
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data, error } = await supabase
     .from('processing_jobs')
@@ -463,7 +463,7 @@ export async function updateProcessingJobStatus(
   status: 'queued' | 'running' | 'completed' | 'failed',
   errorMessage?: string
 ) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const updates: any = {
     status,
@@ -501,7 +501,7 @@ export async function logUserAction(params: {
   userId?: string;
   anonSessionId?: string;
 }) {
-  const supabase = getSupabaseClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data, error } = await supabase
     .from('user_usage')
