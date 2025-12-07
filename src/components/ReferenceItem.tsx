@@ -197,7 +197,7 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
       )}
 
       {/* Context Integrity Section */}
-      {reference.context_integrity_score !== null && reference.context_integrity_score !== undefined && (
+      {reference.context_integrity_score !== null && reference.context_integrity_score !== undefined ? (
         <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-semibold text-purple-700">🤖 Context Integrity Review</p>
@@ -222,6 +222,16 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
               {reference.context_integrity_review}
             </p>
           )}
+        </div>
+      ) : (
+        <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">⚠️</span>
+            <p className="text-sm font-semibold text-gray-700">Reference Not Found in Document</p>
+          </div>
+          <p className="text-xs text-gray-600">
+            This reference appears in the bibliography but was not found cited in the document body. Context integrity review requires in-text citations.
+          </p>
         </div>
       )}
     </li>
