@@ -392,7 +392,7 @@ export async function POST(req: NextRequest) {
 
     // Save total references count to document (full parsed count, not limited)
     const supabase = getSupabaseServiceClient();
-    await supabase
+    await (supabase as any)
       .from('documents')
       .update({ total_references: totalParsedCount })
       .eq('id', document.id);
