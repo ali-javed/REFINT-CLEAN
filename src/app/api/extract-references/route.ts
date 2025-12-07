@@ -445,13 +445,13 @@ Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief exp
                   
                   // Update the reference with AI scores using service client to bypass RLS
                   const supabase = getSupabaseServiceClient();
-                  const { error: updateError } = await (supabase
+                  const { error: updateError } = await (supabase as any)
                     .from('document_references')
                     .update({
                       integrity_score: score,
                       integrity_explanation: explanation,
                       match_status: 'matched',
-                    }) as any)
+                    })
                     .eq('id', docRef.id);
                   
                   if (updateError) {
