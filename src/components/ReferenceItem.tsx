@@ -223,6 +223,16 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
             </p>
           )}
         </div>
+      ) : (reference.context_before || reference.context_after) ? (
+        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">⏳</span>
+            <p className="text-sm font-semibold text-amber-700">Context Integrity Review Pending</p>
+          </div>
+          <p className="text-xs text-amber-600">
+            Context was found in the document. AI review is processing or may have failed. Try re-uploading the document.
+          </p>
+        </div>
       ) : (
         <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
           <div className="flex items-center gap-2 mb-1">
