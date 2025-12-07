@@ -107,6 +107,31 @@ export default function HomePage() {
         {/* Hero */}
         <section id="hero" className="relative overflow-hidden border-b border-zinc-800">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_#4f46e5_0,_transparent_55%)] opacity-30" />
+        
+        {/* Sign In Link - Top Right */}
+        {!session && (
+          <div className="absolute top-4 right-4 z-10">
+            <a
+              href="/signin"
+              className="rounded-full border border-zinc-700 bg-zinc-900/50 px-4 py-2 text-sm font-medium text-zinc-100 backdrop-blur-sm transition hover:border-violet-500 hover:bg-zinc-800"
+            >
+              Sign In
+            </a>
+          </div>
+        )}
+
+        {/* User Menu - Top Right (when signed in) */}
+        {session && (
+          <div className="absolute top-4 right-4 z-10">
+            <a
+              href="/dashboard"
+              className="rounded-full border border-violet-700 bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-300 backdrop-blur-sm transition hover:bg-violet-600/30"
+            >
+              Dashboard
+            </a>
+          </div>
+        )}
+
         <div className="relative mx-auto flex max-w-5xl flex-col items-center px-4 py-20 text-center sm:px-6 lg:px-8">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
             referenceaudit.org

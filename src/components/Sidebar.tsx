@@ -137,6 +137,18 @@ export default function Sidebar({ onCollapseChange }: SidebarProps) {
               {!isCollapsed && <span>Contact</span>}
             </button>
           </nav>
+
+          {/* Bottom section - Dashboard/Sign In */}
+          <div className="border-t border-zinc-800 pt-4">
+            <a
+              href="/signin"
+              className="flex w-full items-center gap-3 rounded-lg px-4 py-2 text-left text-sm text-violet-400 transition hover:bg-zinc-900 hover:text-violet-300"
+              title={isCollapsed ? 'Sign In' : ''}
+            >
+              <span className="text-lg">👤</span>
+              {!isCollapsed && <span>Sign In / Dashboard</span>}
+            </a>
+          </div>
         </div>
       </aside>
 
