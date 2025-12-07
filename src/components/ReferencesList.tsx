@@ -13,6 +13,9 @@ interface Reference {
   raw_reference: string;
   context_before?: string | null;
   context_after?: string | null;
+  integrity_score?: number | null;
+  integrity_explanation?: string | null;
+  match_status?: string | null;
 }
 
 interface PdfMetadata {
@@ -76,49 +79,38 @@ export default function ReferencesList({
 
   useEffect(() => {
     async function fetchAndSort() {
-      const refsWithMetadata: ReferenceWithMetadata[] = await Promise.all(
-        references.map(async (ref) => {
-          try {
-            const res = await fetch('/api/pdf-lookup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                reference: ref.raw_reference,
-                context_before: ref.context_before,
-                context_after: ref.context_after,
-              }),
-            });
-            const data = await res.json();
-            return {
-              ...ref,
-              pdfFound: data.found === true,
-              metadata: data,
-            };
-          } catch (err) {
-            console.error('Error fetching PDF metadata:', err);
-            return {
-              ...ref,
-              pdfFound: false,
-              metadata: null,
-            };
-          }
-        })
-      );
+      // Use integrity scores from database instead of fetching from API
+      const refsWithMetadata: ReferenceWithMetadata[] = references.map((ref) => {
+        const hasScore = ref.integrity_score !== null && ref.integrity_score !== undefined;
+        const score = ref.integrity_score || 0;
+        return {
+          ...ref,
+          pdfFound: hasScore && score > 50, // Consider "found" if scored above 50
+          metadata: hasScore ? {
+            found: true,
+            integrity: {
+              score: score / 10, // Convert 0-100 to 0-10 scale for display
+              justification: ref.integrity_explanation || 'No explanation provided',
+              analyzed: true,
+            }
+          } : null,
+        };
+      });
 
-      // Sort: papers found first, not found last
+      // Sort: higher scores first
       const sorted = refsWithMetadata.sort((a, b) => {
-        if (a.pdfFound !== b.pdfFound) {
-          return a.pdfFound ? -1 : 1; // Found papers first
-        }
-        return 0; // Keep original order if both have same status
+        const scoreA = a.metadata?.integrity?.score ?? 0;
+        const scoreB = b.metadata?.integrity?.score ?? 0;
+        return scoreB - scoreA;
       });
 
       setSortedReferences(sorted);
-      // Compute average integrity score for found items
+      
+      // Compute average integrity score
       const scores: number[] = [];
       let found = 0;
       sorted.forEach((item) => {
-        if (item.metadata?.found && item.metadata?.integrity?.score) {
+        if (item.metadata?.integrity?.score !== null && item.metadata?.integrity?.score !== undefined) {
           scores.push(item.metadata.integrity.score);
           found += 1;
         }
@@ -131,22 +123,30 @@ export default function ReferencesList({
         setAvgScore(null);
       }
 
-      // Request AI summary of integrity justifications
+      // Generate AI summary from integrity explanations
       setSummaryLoading(true);
       try {
-        const res = await fetch('/api/reference-summary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            reviews: sorted
-              .map((item) => item.metadata?.integrity)
-              .filter(Boolean),
-          }),
-        });
-        const data = await res.json();
-        if (data?.summary) setAiSummary(data.summary);
+        const explanations = sorted
+          .map((item) => item.metadata?.integrity?.justification)
+          .filter(Boolean);
+        
+        if (explanations.length > 0) {
+          // Create a summary from all explanations
+          const avgScoreVal = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+          const qualityLevel = avgScoreVal >= 8 ? 'excellent' : avgScoreVal >= 6 ? 'good' : 'needs improvement';
+          
+          const summary = `Overall document quality is ${qualityLevel}. Average integrity score: ${avgScoreVal.toFixed(1)}/10. ` +
+            `${found} out of ${sorted.length} references were analyzed. ` +
+            (avgScoreVal >= 8 
+              ? 'Most references are well-formatted with complete citation information.'
+              : avgScoreVal >= 6
+              ? 'Most references are adequate but some may benefit from additional review.'
+              : 'Several references may need review for completeness and proper formatting.');
+          
+          setAiSummary(summary);
+        }
       } catch (err) {
-        console.error('Error fetching AI summary:', err);
+        console.error('Error generating summary:', err);
       } finally {
         setSummaryLoading(false);
         setLoading(false);

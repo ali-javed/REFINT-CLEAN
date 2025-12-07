@@ -115,8 +115,14 @@ export default function DashboardPage() {
 
   const handleUpload = async (file: File) => {
     setUploading(true);
+    setError(null);
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Add userId if authenticated
+    if (session?.user?.id) {
+      formData.append('userId', session.user.id);
+    }
 
     try {
       const res = await fetch('/api/extract-references', {
@@ -128,16 +134,28 @@ export default function DashboardPage() {
 
       if (!res.ok) {
         console.error('Upload error:', json);
-        alert(`Error: ${json.error || json.message || 'Upload failed'}`);
+        setError(json.error || json.message || 'Upload failed');
         return;
       }
 
       if (json.documentId) {
+        // Refetch documents to show the new one
+        const { data: docsData } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', session?.user?.id || '')
+          .order('created_at', { ascending: false });
+        
+        if (docsData) {
+          setDocuments(docsData as Document[]);
+        }
+        
+        // Navigate to the document page
         router.push(`/references/${json.documentId}`);
       }
     } catch (err) {
       console.error('Upload error:', err);
-      alert('Upload failed. Please try again.');
+      setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -204,6 +222,11 @@ export default function DashboardPage() {
             <p className="mb-4 text-sm text-zinc-400">
               Upload a document to verify your references
             </p>
+            {error && (
+              <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
             <label htmlFor="dashboard-upload" className="cursor-pointer">
               <input
                 id="dashboard-upload"
@@ -216,8 +239,8 @@ export default function DashboardPage() {
                   if (file) handleUpload(file);
                 }}
               />
-              <span className="inline-block rounded-full bg-violet-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-violet-500">
-                {uploading ? 'Uploading...' : '📄 Upload Document'}
+              <span className="inline-block rounded-full bg-violet-600 px-6 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-violet-500 disabled:opacity-50">
+                {uploading ? '⏳ Processing...' : '📄 Upload Document'}
               </span>
             </label>
           </div>
@@ -272,38 +295,86 @@ export default function DashboardPage() {
               <p className="text-sm text-zinc-500">Upload your first document to get started</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {documents.map((doc) => (
                 <div
                   key={doc.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/50 p-4 transition hover:border-zinc-700"
+                  className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-5 transition hover:border-zinc-700"
                 >
-                  <div className="flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      <h3 className="font-medium text-zinc-100">{doc.filename}</h3>
-                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(doc.status)}`}>
-                        {doc.status === 'completed' && '✓'}
-                        {doc.status === 'processing' && '⏳'}
-                        {doc.status === 'failed' && '✗'}
-                        {doc.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-zinc-500">
-                      <span>{new Date(doc.created_at).toLocaleDateString()}</span>
-                      <span>{doc.total_references} references</span>
-                      {doc.overall_integrity_score !== null && (
-                        <span className="font-medium text-zinc-400">
-                          Score: {Math.round(doc.overall_integrity_score)}
+                  <div className="mb-3 flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="mb-2 flex items-center gap-2">
+                        <h3 className="font-semibold text-zinc-100">{doc.filename}</h3>
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(doc.status)}`}>
+                          {doc.status === 'completed' && '✓'}
+                          {doc.status === 'processing' && '⏳'}
+                          {doc.status === 'failed' && '✗'}
+                          {doc.status}
                         </span>
+                      </div>
+                      
+                      {/* Integrity Score */}
+                      {doc.overall_integrity_score !== null && (
+                        <div className="mb-2 flex items-center gap-3">
+                          <span className="text-sm text-zinc-400">Integrity Score:</span>
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-24 overflow-hidden rounded-full bg-zinc-800">
+                              <div
+                                className={`h-full transition-all ${
+                                  doc.overall_integrity_score >= 80 
+                                    ? 'bg-emerald-500' 
+                                    : doc.overall_integrity_score >= 60 
+                                    ? 'bg-amber-500' 
+                                    : 'bg-red-500'
+                                }`}
+                                style={{ width: `${doc.overall_integrity_score}%` }}
+                              />
+                            </div>
+                            <span className={`text-sm font-semibold ${
+                              doc.overall_integrity_score >= 80 
+                                ? 'text-emerald-400' 
+                                : doc.overall_integrity_score >= 60 
+                                ? 'text-amber-400' 
+                                : 'text-red-400'
+                            }`}>
+                              {Math.round(doc.overall_integrity_score)}/100
+                            </span>
+                          </div>
+                        </div>
                       )}
+                      
+                      {/* AI Review Summary */}
+                      {doc.status === 'completed' && (
+                        <div className="mb-2 rounded-md bg-zinc-900/60 border border-zinc-800 p-3">
+                          <p className="text-xs font-medium text-zinc-400 mb-1">AI Review Summary:</p>
+                          <p className="text-sm text-zinc-300">
+                            {doc.overall_integrity_score !== null ? (
+                              doc.overall_integrity_score >= 80 
+                                ? `✓ Excellent quality. All ${doc.total_references} references appear well-formatted and complete with proper citations.`
+                                : doc.overall_integrity_score >= 60 
+                                ? `⚠ Good quality. Most of the ${doc.total_references} references are valid, but some may need review for completeness.`
+                                : `⚠ Needs attention. Several of the ${doc.total_references} references may be incomplete or improperly formatted.`
+                            ) : (
+                              `Analyzed ${doc.total_references} references from your document.`
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center gap-4 text-xs text-zinc-500">
+                        <span>📅 {new Date(doc.created_at).toLocaleDateString()}</span>
+                        <span>📝 {doc.total_references} references</span>
+                      </div>
                     </div>
+                    
+                    <button
+                      onClick={() => router.push(`/references/${doc.id}`)}
+                      disabled={doc.status !== 'completed'}
+                      className="ml-4 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-violet-500 hover:text-violet-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-zinc-700 disabled:hover:text-zinc-300"
+                    >
+                      View Report
+                    </button>
                   </div>
-                  <button
-                    onClick={() => router.push(`/references/${doc.id}`)}
-                    className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-violet-500 hover:text-violet-400"
-                  >
-                    View Report
-                  </button>
                 </div>
               ))}
             </div>

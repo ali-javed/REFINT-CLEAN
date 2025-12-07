@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractText } from 'unpdf';
 import { getSupabaseClient } from '@/utils/supabase/server';
+import { createDocument, createDocumentReferences, updateDocumentStatus, calculateDocumentIntegrityScore } from '@/utils/database/operations';
 
 interface ReferenceWithContext {
   raw_reference: string;
@@ -298,6 +299,8 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
+    const userId = formData.get('userId') as string | null;
+    const anonSessionId = formData.get('anonSessionId') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -320,49 +323,141 @@ export async function POST(req: NextRequest) {
     
     console.log(`[extract-references] Buffer created: ${buffer.length} bytes`);
 
-    // 1) Extract references with context from the PDF
+    // 1) Create document record in database
+    const document = await createDocument({
+      filename: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      userId: userId || undefined,
+      anonSessionId: anonSessionId || undefined,
+    });
+    
+    console.log(`[extract-references] Created document record: ${document.id}`);
+
+    // 2) Extract references with context from the PDF
     console.log(`[extract-references] Extracting references from ${file.name}...`);
     const startTime = Date.now();
     
     let referencesWithContext;
     try {
+      // Update status to processing
+      await updateDocumentStatus(document.id, 'processing');
+      
       referencesWithContext = await extractReferencesFromPdf(buffer, file.name);
     } catch (pdfError) {
       console.error('[extract-references] PDF extraction failed:', pdfError);
+      await updateDocumentStatus(document.id, 'failed');
       throw new Error(`PDF extraction failed: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`);
     }
     
     const duration = Date.now() - startTime;
     console.log(`[extract-references] Extraction took ${duration}ms for ${referencesWithContext.length} references`);
 
-    // 2) Save them to Supabase
-    const supabase = getSupabaseClient();
-    const documentId = crypto.randomUUID();
+    // 3) Save document references to database
+    const documentReferences = await createDocumentReferences(
+      document.id,
+      referencesWithContext.map((ref, index) => ({
+        rawCitationText: ref.raw_reference,
+        contextBefore: ref.context_before || undefined,
+        contextAfter: ref.context_after || undefined,
+        positionInDoc: index,
+      }))
+    );
+    
+    console.log(`[extract-references] Created ${documentReferences.length} document references`);
 
-    const rows = referencesWithContext.map((ref) => ({
-      document_id: documentId,
-      raw_reference: ref.raw_reference,
-      context_before: ref.context_before,
-      context_after: ref.context_after,
-    }));
+    // 4) Process references with AI to calculate integrity scores
+    console.log('[extract-references] Starting AI review of references...');
+    const aiStartTime = Date.now();
+    
+    try {
+      // Call OpenAI API to review each reference
+      const openaiApiKey = process.env.OPENAI_API_KEY;
+      if (!openaiApiKey) {
+        console.warn('[extract-references] OpenAI API key not configured, skipping AI review');
+      } else {
+        for (const docRef of documentReferences) {
+          try {
+            // Simple AI review: check if reference looks valid
+            const prompt = `Analyze this academic reference and rate its integrity on a scale of 0-100. Consider factors like:
+- Does it have author names?
+- Does it have a title?
+- Does it have a year?
+- Does it look properly formatted?
+- Is it complete?
 
-    const { error: insertError } = await supabase
-      .from('references_list')
-      .insert(rows);
+Reference: ${docRef.raw_citation_text}
 
-    if (insertError) {
-      console.error('Supabase insert error:', insertError);
-      return NextResponse.json(
-        { error: `Database error: ${insertError.message}` },
-        { status: 500 }
-      );
+Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief explanation>"}`;
+            
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiApiKey}`,
+              },
+              body: JSON.stringify({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                  { role: 'system', content: 'You are an academic reference validation assistant.' },
+                  { role: 'user', content: prompt },
+                ],
+                temperature: 0.3,
+              }),
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              const content = data.choices?.[0]?.message?.content;
+              
+              if (content) {
+                try {
+                  const result = JSON.parse(content);
+                  const score = Math.max(0, Math.min(100, result.score || 50));
+                  const explanation = result.explanation || 'AI review completed';
+                  
+                  // Update the reference with AI scores
+                  const supabase = getSupabaseClient();
+                  await supabase
+                    .from('document_references')
+                    .update({
+                      integrity_score: score,
+                      integrity_explanation: explanation,
+                      match_status: 'matched',
+                    } as any)
+                    .eq('id', docRef.id);
+                  
+                  console.log(`[extract-references] AI review for reference ${docRef.id}: ${score}/100`);
+                } catch (parseError) {
+                  console.error('[extract-references] Failed to parse AI response:', parseError);
+                }
+              }
+            }
+          } catch (aiError) {
+            console.error(`[extract-references] AI review failed for reference ${docRef.id}:`, aiError);
+          }
+        }
+      }
+    } catch (aiError) {
+      console.error('[extract-references] AI review process failed:', aiError);
     }
+    
+    const aiDuration = Date.now() - aiStartTime;
+    console.log(`[extract-references] AI review took ${aiDuration}ms`);
 
-    console.log(`[extract-references] Successfully processed ${referencesWithContext.length} references`);
+    // 5) Calculate overall document integrity score
+    const overallScore = await calculateDocumentIntegrityScore(document.id);
+    console.log(`[extract-references] Overall document integrity score: ${overallScore}`);
+
+    // 6) Update document status to completed
+    await updateDocumentStatus(document.id, 'completed', overallScore || undefined);
+
+    console.log(`[extract-references] Successfully processed document ${document.id}`);
     
     return NextResponse.json({
-      documentId,
+      documentId: document.id,
       referencesCount: referencesWithContext.length,
+      overallScore,
     }, { status: 200 });
   } catch (err) {
     console.error('[extract-references] Error:', err);
