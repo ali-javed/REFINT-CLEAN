@@ -229,18 +229,58 @@ BEGIN
 END $$;
 
 -- Row Level Security (RLS) Policies
+-- Note: Policies are created after all columns are added to avoid reference errors
 
--- Enable RLS on all tables
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_plans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE anon_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE canonical_references ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document_references ENABLE ROW LEVEL SECURITY;
-ALTER TABLE processing_jobs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_usage ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_feedback ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on all tables (only if not already enabled)
+DO $$ 
+BEGIN
+  -- Enable RLS only if table exists and RLS is not already enabled
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'profiles') THEN
+    ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'user_plans') THEN
+    ALTER TABLE user_plans ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'anon_sessions') THEN
+    ALTER TABLE anon_sessions ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'documents') THEN
+    ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'canonical_references') THEN
+    ALTER TABLE canonical_references ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'document_references') THEN
+    ALTER TABLE document_references ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'processing_jobs') THEN
+    ALTER TABLE processing_jobs ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'user_usage') THEN
+    ALTER TABLE user_usage ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'audit_feedback') THEN
+    ALTER TABLE audit_feedback ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
+-- Drop existing policies if they exist to avoid conflicts
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view own plan" ON user_plans;
+DROP POLICY IF EXISTS "Users can view own documents" ON documents;
+DROP POLICY IF EXISTS "Users can create own documents" ON documents;
+DROP POLICY IF EXISTS "Users can update own documents" ON documents;
+DROP POLICY IF EXISTS "Anon users can view session documents" ON documents;
+DROP POLICY IF EXISTS "Anon users can create session documents" ON documents;
+DROP POLICY IF EXISTS "Users can view own document references" ON document_references;
+DROP POLICY IF EXISTS "Users can create document references" ON document_references;
+DROP POLICY IF EXISTS "Users can update own document references" ON document_references;
+DROP POLICY IF EXISTS "Anon users can view session document references" ON document_references;
+DROP POLICY IF EXISTS "Anon users can create session document references" ON document_references;
+DROP POLICY IF EXISTS "Anyone can read canonical references" ON canonical_references;
+DROP POLICY IF EXISTS "Users can view own feedback" ON audit_feedback;
+DROP POLICY IF EXISTS "Users can create feedback" ON audit_feedback;
 -- Profiles: Users can read and update their own profile
 CREATE POLICY "Users can view own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
