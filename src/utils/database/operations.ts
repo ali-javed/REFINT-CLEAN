@@ -393,7 +393,7 @@ export async function updateProcessingJobStatus(
     updates.completed_at = new Date().toISOString();
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('processing_jobs')
     .update(updates as any)
     .eq('id', jobId)
