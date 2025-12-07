@@ -264,23 +264,30 @@ BEGIN
   END IF;
 END $$;
 
--- Drop existing policies if they exist to avoid conflicts
-DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
-DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
-DROP POLICY IF EXISTS "Users can view own plan" ON user_plans;
-DROP POLICY IF EXISTS "Users can view own documents" ON documents;
-DROP POLICY IF EXISTS "Users can create own documents" ON documents;
-DROP POLICY IF EXISTS "Users can update own documents" ON documents;
-DROP POLICY IF EXISTS "Anon users can view session documents" ON documents;
-DROP POLICY IF EXISTS "Anon users can create session documents" ON documents;
-DROP POLICY IF EXISTS "Users can view own document references" ON document_references;
-DROP POLICY IF EXISTS "Users can create document references" ON document_references;
-DROP POLICY IF EXISTS "Users can update own document references" ON document_references;
-DROP POLICY IF EXISTS "Anon users can view session document references" ON document_references;
-DROP POLICY IF EXISTS "Anon users can create session document references" ON document_references;
-DROP POLICY IF EXISTS "Anyone can read canonical references" ON canonical_references;
-DROP POLICY IF EXISTS "Users can view own feedback" ON audit_feedback;
-DROP POLICY IF EXISTS "Users can create feedback" ON audit_feedback;
+-- Drop existing policies if they exist to avoid conflicts (must happen before columns are checked)
+DO $$ 
+BEGIN
+  -- Drop all policies first
+  DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+  DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+  DROP POLICY IF EXISTS "Users can view own plan" ON user_plans;
+  DROP POLICY IF EXISTS "Users can view own documents" ON documents;
+  DROP POLICY IF EXISTS "Users can create own documents" ON documents;
+  DROP POLICY IF EXISTS "Users can update own documents" ON documents;
+  DROP POLICY IF EXISTS "Anon users can view session documents" ON documents;
+  DROP POLICY IF EXISTS "Anon users can create session documents" ON documents;
+  DROP POLICY IF EXISTS "Users can view own document references" ON document_references;
+  DROP POLICY IF EXISTS "Users can create document references" ON document_references;
+  DROP POLICY IF EXISTS "Users can update own document references" ON document_references;
+  DROP POLICY IF EXISTS "Anon users can view session document references" ON document_references;
+  DROP POLICY IF EXISTS "Anon users can create session document references" ON document_references;
+  DROP POLICY IF EXISTS "Anyone can read canonical references" ON canonical_references;
+  DROP POLICY IF EXISTS "Users can view own feedback" ON audit_feedback;
+  DROP POLICY IF EXISTS "Users can create feedback" ON audit_feedback;
+EXCEPTION
+  WHEN OTHERS THEN NULL; -- Ignore errors if policies don't exist
+END $$;
+
 -- Profiles: Users can read and update their own profile
 CREATE POLICY "Users can view own profile" ON profiles
   FOR SELECT USING (auth.uid() = id);
