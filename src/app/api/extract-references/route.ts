@@ -2,7 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractText } from 'unpdf';
 import { getSupabaseClient } from '@/utils/supabase/server';
-import { createDocument, createDocumentReferences, updateDocumentStatus, calculateDocumentIntegrityScore } from '@/utils/database/operations';
+import { 
+  createDocument, 
+  createDocumentReferences, 
+  updateDocumentStatus, 
+  calculateDocumentIntegrityScore,
+  createAnonSession,
+  getAnonSessionByToken
+} from '@/utils/database/operations';
 
 interface ReferenceWithContext {
   raw_reference: string;
@@ -299,8 +306,8 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
-    const userId = formData.get('userId') as string | null;
-    const anonSessionId = formData.get('anonSessionId') as string | null;
+    let userId = formData.get('userId') as string | null;
+    let anonSessionId = formData.get('anonSessionId') as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -315,8 +322,34 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Ensure we have either userId or anonSessionId
+    if (!userId && !anonSessionId) {
+      return NextResponse.json(
+        { error: 'Either userId or anonSessionId must be provided' },
+        { status: 400 }
+      );
+    }
+    
+    // If anonSessionId is provided but doesn't exist in DB, create it
+    if (anonSessionId && !userId) {
+      try {
+        const existingSession = await getAnonSessionByToken(anonSessionId);
+        if (!existingSession) {
+          const newSession = await createAnonSession(anonSessionId);
+          console.log(`[extract-references] Created new anon session: ${newSession.id}`);
+        }
+      } catch (err) {
+        console.error('[extract-references] Failed to create anon session:', err);
+        return NextResponse.json(
+          { error: 'Failed to create anonymous session' },
+          { status: 500 }
+        );
+      }
+    }
 
     console.log(`[extract-references] File received: ${file.name}, size: ${file.size} bytes`);
+    console.log(`[extract-references] userId: ${userId}, anonSessionId: ${anonSessionId}`);
     
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

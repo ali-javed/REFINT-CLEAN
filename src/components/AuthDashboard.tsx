@@ -69,7 +69,7 @@ export default function AuthDashboard() {
           </div>
 
           <div className="border border-slate-200 rounded-2xl shadow-sm px-4 sm:px-6 py-6 sm:py-8">
-            <UploadForm />
+            <UploadForm userId={session.user.id} />
           </div>
         </div>
       ) : (

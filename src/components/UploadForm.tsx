@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function UploadForm() {
+interface UploadFormProps {
+  userId?: string;
+  anonSessionId?: string;
+}
+
+export default function UploadForm({ userId, anonSessionId }: UploadFormProps) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,6 +28,13 @@ export default function UploadForm() {
 
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
+    
+    // Add user ID or anon session ID
+    if (userId) {
+      formData.append('userId', userId);
+    } else if (anonSessionId) {
+      formData.append('anonSessionId', anonSessionId);
+    }
 
     try {
       setIsLoading(true);

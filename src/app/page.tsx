@@ -49,12 +49,20 @@ export default function HomePage() {
     }
   }, []);
   const [session, setSession] = useState<Session | null>(null);
+  const [anonSessionId, setAnonSessionId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = async (file: File) => {
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
+    
+    // Add user ID or anon session ID
+    if (session?.user?.id) {
+      formData.append('userId', session.user.id);
+    } else if (anonSessionId) {
+      formData.append('anonSessionId', anonSessionId);
+    }
 
     try {
       const res = await fetch('/api/extract-references', {
@@ -86,10 +94,38 @@ export default function HomePage() {
     supabase.auth.getSession().then(({ data }) => {
       console.log('[HomePage] Session loaded:', { exists: !!data.session, email: data.session?.user.email });
       setSession(data.session ?? null);
+      
+      // If no user session, create/get anon session
+      if (!data.session) {
+        const storedAnonId = localStorage.getItem('anonSessionId');
+        if (storedAnonId) {
+          setAnonSessionId(storedAnonId);
+        } else {
+          // Generate new anon session ID
+          const newAnonId = crypto.randomUUID();
+          localStorage.setItem('anonSessionId', newAnonId);
+          setAnonSessionId(newAnonId);
+        }
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       console.log('[HomePage] Auth state changed:', { event: _event, exists: !!nextSession });
       setSession(nextSession);
+      
+      // Clear anon session if user logs in
+      if (nextSession) {
+        setAnonSessionId(null);
+      } else {
+        // Create anon session if user logs out
+        const storedAnonId = localStorage.getItem('anonSessionId');
+        if (storedAnonId) {
+          setAnonSessionId(storedAnonId);
+        } else {
+          const newAnonId = crypto.randomUUID();
+          localStorage.setItem('anonSessionId', newAnonId);
+          setAnonSessionId(newAnonId);
+        }
+      }
     });
     return () => {
       sub.subscription.unsubscribe();
