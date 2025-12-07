@@ -44,7 +44,7 @@ export default function DashboardPage() {
 
         if (profileError && profileError.code === 'PGRST116') {
           // Profile doesn't exist, create it
-          const { data: newProfile, error: createError } = await supabase
+          const { data: newProfile, error: createError } = await (supabase as any)
             .from('profiles')
             .insert({
               id: currentSession.user.id,
@@ -72,7 +72,7 @@ export default function DashboardPage() {
 
         if (planError && planError.code === 'PGRST116') {
           // Plan doesn't exist, create default free plan
-          const { data: newPlan, error: createError } = await supabase
+          const { data: newPlan, error: createError } = await (supabase as any)
             .from('user_plans')
             .insert({
               user_id: currentSession.user.id,
