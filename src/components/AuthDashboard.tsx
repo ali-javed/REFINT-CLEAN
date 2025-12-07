@@ -36,31 +36,8 @@ export default function AuthDashboard() {
       return;
     }
 
-    setAuthLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
-
-      if (data.session) {
-        setSession(data.session);
-        setStatus('Signed in. Welcome!');
-        return;
-      }
-
-      // If email confirmation is required, attempt sign-in to create a session
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) throw signInError;
-      setSession(signInData.session ?? null);
-      setStatus('Signed in. Welcome!');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Auth error';
-      setStatus(message);
-    } finally {
-      setAuthLoading(false);
-    }
+    // Redirect to signup disabled page
+    window.location.href = '/signup-disabled';
   }
 
   function handleSignOut() {

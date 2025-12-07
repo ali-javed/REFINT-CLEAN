@@ -67,33 +67,9 @@ export default function InlineSignUp({ onAuthSuccess }: InlineSignUpProps) {
           onAuthSuccess?.(data.session);
         }
       } else {
-        // Sign up (no email confirmation)
-        console.log('[InlineSignUp] Attempting signup with:', email);
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: {} },
-        });
-        console.log('[InlineSignUp] Signup response:', { data, error });
-        if (error) throw error;
-        if (data.session) {
-          // Immediate signin if session created
-          setStatus('Account created and signed in!');
-          onAuthSuccess?.(data.session);
-        } else {
-          // No session returned - try to sign in immediately
-          console.log('[InlineSignUp] No session from signup, attempting automatic signin...');
-          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-          console.log('[InlineSignUp] Auto signin response:', { signInData, signInError });
-          if (signInError) throw signInError;
-          if (signInData.session) {
-            setStatus('Account created and signed in!');
-            onAuthSuccess?.(signInData.session);
-          }
-        }
+        // Sign up disabled - redirect to coming soon page
+        window.location.href = '/signup-disabled';
+        return;
       }
     } catch (err) {
       let message = err instanceof Error ? err.message : (isSignIn ? 'Sign in failed' : 'Signup failed');
