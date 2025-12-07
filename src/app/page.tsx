@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import UploadForm from '@/components/UploadForm';
+import Sidebar from '@/components/Sidebar';
 import { getBrowserSupabaseClient } from '@/utils/supabase/browser';
 
 const integrityRanges = [
@@ -97,10 +98,14 @@ export default function HomePage() {
 
 
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-50">
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-zinc-800">
+    <>
+      <Sidebar onCollapseChange={setSidebarCollapsed} />
+      <main className={`min-h-screen bg-zinc-950 text-zinc-50 transition-all duration-300 ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+        {/* Hero */}
+        <section id="hero" className="relative overflow-hidden border-b border-zinc-800">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_#4f46e5_0,_transparent_55%)] opacity-30" />
         <div className="relative mx-auto flex max-w-5xl flex-col items-center px-4 py-20 text-center sm:px-6 lg:px-8">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">
@@ -117,7 +122,7 @@ export default function HomePage() {
 
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <label htmlFor="hero-upload" className="w-full sm:w-auto cursor-pointer">
-              <span className="inline-block w-full rounded-full bg-indigo-500 px-8 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-500/30 transition hover:bg-indigo-400 text-center">
+              <span className="inline-block w-full rounded-full bg-violet-600 px-8 py-3 text-sm font-medium text-white shadow-lg shadow-violet-500/30 transition hover:bg-violet-500 text-center">
                 {uploading ? 'Uploading...' : 'Upload document'}
               </span>
               <input
@@ -143,8 +148,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        {/* Features */}
+        <section id="features" className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mb-10 text-center">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Three layers of reference verification
@@ -181,8 +186,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Integrity score explanation */}
-      <section className="border-y border-zinc-800 bg-zinc-900/30">
+        {/* Integrity score explanation */}
+        <section id="integrity-score" className="border-y border-zinc-800 bg-zinc-900/30">
         <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             Reference Integrity Score™ (0–100)
@@ -213,8 +218,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        {/* How it works */}
+        <section id="how-it-works" className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="mb-10 text-center">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
             How ReferenceAudit works
@@ -322,8 +327,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing teaser */}
-      <section className="border-y border-zinc-800 bg-zinc-900/40">
+        {/* Pricing teaser */}
+        <section id="pricing" className="border-y border-zinc-800 bg-zinc-900/40">
         <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -334,39 +339,81 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6">
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6 flex flex-col">
               <h3 className="text-lg font-semibold">Free</h3>
               <p className="mt-2 text-sm text-zinc-400">
                 Ideal for trying out ReferenceAudit on a single document.
               </p>
-              <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+              <ul className="mt-4 space-y-2 text-sm text-zinc-300 flex-grow">
                 <li>• 1 document per month</li>
                 <li>• Integrity score overview</li>
                 <li>• Blurred detailed report</li>
               </ul>
+              <label htmlFor="pricing-free-upload" className="mt-6 cursor-pointer">
+                <span className="inline-block w-full rounded-full bg-violet-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 text-center">
+                  {uploading ? 'Uploading...' : 'Upload document'}
+                </span>
+                <input
+                  id="pricing-free-upload"
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUpload(file);
+                  }}
+                />
+              </label>
+              <p className="mt-2 text-xs text-zinc-400 text-center">No sign up needed</p>
             </div>
-            <div className="rounded-2xl border border-indigo-500 bg-zinc-950 p-6 shadow-lg shadow-indigo-500/20">
+            <div className="rounded-2xl border border-emerald-500 bg-zinc-950 p-6 shadow-lg shadow-emerald-500/20 flex flex-col">
+              <h3 className="text-lg font-semibold">Academic</h3>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-zinc-50">$4.99</span>
+                <span className="text-sm text-zinc-400">/month</span>
+              </div>
+              <p className="mt-2 text-sm text-zinc-300">
+                For students and educators with .edu email addresses.
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-zinc-300 flex-grow">
+                <li>• 10 free documents/month</li>
+                <li>• Full unblurred reports</li>
+                <li>• Requires .edu email</li>
+                <li>• Then $4.99/month</li>
+              </ul>
+              <button className="mt-6 w-full rounded-full bg-emerald-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-400">
+                Sign up to start free trial
+              </button>
+              <p className="mt-2 text-xs text-zinc-400 text-center">1 month free trial</p>
+            </div>
+            <div className="rounded-2xl border border-indigo-500 bg-zinc-950 p-6 shadow-lg shadow-indigo-500/20 flex flex-col">
               <h3 className="text-lg font-semibold">Pro</h3>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-zinc-50">$7.99</span>
+                <span className="text-sm text-zinc-400">/month</span>
+              </div>
               <p className="mt-2 text-sm text-zinc-300">
                 For serious research, supervision, and editorial workflows.
               </p>
-              <ul className="mt-4 space-y-2 text-sm text-zinc-300">
+              <ul className="mt-4 space-y-2 text-sm text-zinc-300 flex-grow">
                 <li>• Unlimited document audits</li>
                 <li>• Full unblurred reports</li>
                 <li>• Exportable integrity PDFs</li>
                 <li>• Priority model & updates</li>
               </ul>
               <button className="mt-6 w-full rounded-full bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400">
-                Start free
+                Sign up to start free trial
               </button>
+              <p className="mt-2 text-xs text-zinc-400 text-center">1 month free trial</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        {/* FAQ */}
+        <section id="faq" className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Frequently asked questions</h2>
         <div className="mt-6 space-y-5">
           {faqs.map((item) => (
@@ -391,7 +438,7 @@ export default function HomePage() {
               </p>
             </div>
             <label htmlFor="footer-upload" className="cursor-pointer">
-              <span className="inline-block rounded-full bg-indigo-500 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400">
+              <span className="inline-block rounded-full bg-violet-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500">
                 {uploading ? 'Uploading...' : 'Upload document'}
               </span>
               <input
@@ -408,7 +455,119 @@ export default function HomePage() {
             </label>
           </div>
         </div>
-      </section>
-    </main>
+        </section>
+
+        {/* Contact Form */}
+        <section id="contact" className="border-t border-zinc-800 bg-zinc-950">
+          <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">Get in touch</h2>
+              <p className="mt-3 text-sm text-zinc-400 sm:text-base">
+                Have questions? We&apos;d love to hear from you.
+              </p>
+            </div>
+
+            <ContactForm />
+          </div>
+        </section>
+      </main>
+    </>
+  );
+}
+
+function ContactForm() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      setStatus('Message sent successfully! We\'ll get back to you soon.');
+      setName('');
+      setEmail('');
+      setMessage('');
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to send message';
+      setStatus(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="name" className="block text-sm font-medium text-zinc-300 mb-1">
+          Name
+        </label>
+        <input
+          id="name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          placeholder="Your name"
+        />
+      </div>
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-1">
+          Email
+        </label>
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          placeholder="you@example.com"
+        />
+      </div>
+      <div>
+        <label htmlFor="message" className="block text-sm font-medium text-zinc-300 mb-1">
+          Message
+        </label>
+        <textarea
+          id="message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          required
+          rows={5}
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          placeholder="Your message..."
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded-full bg-violet-600 px-6 py-2.5 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-60"
+      >
+        {loading ? 'Sending...' : 'Send message'}
+      </button>
+      {status && (
+        <p className={`text-sm text-center ${status.includes('success') ? 'text-emerald-400' : 'text-red-400'}`}>
+          {status}
+        </p>
+      )}
+    </form>
   );
 }
