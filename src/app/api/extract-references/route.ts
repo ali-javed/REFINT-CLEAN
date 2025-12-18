@@ -416,26 +416,41 @@ export async function POST(req: NextRequest) {
         // Also handle ranges like [3-5] and lists like [35, 2, 5]
         const refNumber = bibEntry.entryId;
         
-        // Create regex patterns to find this reference number
-        const patterns = [
-          new RegExp(`\\[${refNumber}\\]`, 'g'), // [35]
-          new RegExp(`\\[\\d+,\\s*${refNumber}(?:\\s*,|\\])`, 'g'), // [1, 35] or [1, 35, 5]
-          new RegExp(`\\[${refNumber}\\s*,`, 'g'), // [35, 2]
-          new RegExp(`\\[\\d+\\s*-\\s*${refNumber}\\]`, 'g'), // [33-35]
-          new RegExp(`\\[${refNumber}\\s*-\\s*\\d+\\]`, 'g'), // [35-40]
-        ];
+        // Find all citation brackets that contain this reference number
+        // Match patterns like: [5], [35, 2, 5], [2, 5], [5, 10], [3-5], [5-10]
+        const citationBrackets = bodyText.match(/\[\d+(?:\s*[-,]\s*\d+)*\]/g) || [];
         
-        const bodyText = parsedDoc.bodyText;
         const foundPositions: number[] = [];
         
-        // Find all positions where this reference is cited
-        for (const pattern of patterns) {
-          let match;
-          pattern.lastIndex = 0; // Reset regex
-          while ((match = pattern.exec(bodyText)) !== null) {
-            foundPositions.push(match.index);
+        for (const bracket of citationBrackets) {
+          // Check if this bracket contains our reference number
+          const numbers = bracket.replace(/[\[\]]/g, '').split(/[-,]\s*/);
+          
+          // Handle ranges like [3-5]
+          if (bracket.includes('-')) {
+            const [start, end] = numbers.map(n => parseInt(n.trim()));
+            const refNum = parseInt(refNumber);
+            if (refNum >= start && refNum <= end) {
+              // Find position of this bracket in body text
+              const pos = bodyText.indexOf(bracket);
+              if (pos !== -1) foundPositions.push(pos);
+            }
+          } else {
+            // Handle lists like [35, 2, 5]
+            if (numbers.map(n => n.trim()).includes(refNumber)) {
+              // Find ALL occurrences of this exact bracket
+              let searchPos = 0;
+              while (true) {
+                const pos = bodyText.indexOf(bracket, searchPos);
+                if (pos === -1) break;
+                foundPositions.push(pos);
+                searchPos = pos + 1;
+              }
+            }
           }
         }
+        
+        const bodyText = parsedDoc.bodyText;
         
         // Remove duplicates and sort
         const uniquePositions = [...new Set(foundPositions)].sort((a, b) => a - b);

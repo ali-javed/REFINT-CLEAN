@@ -147,6 +147,9 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
         {/* Full reference */}
         <div className="pl-4 border-l-2 border-slate-300">
           <p className="text-sm text-slate-900 leading-relaxed">
+            <span className="font-semibold text-blue-700 mr-2">
+              {getCitationFormat()}
+            </span>
             {reference.raw_reference}
           </p>
           {contexts.length > 1 && (
