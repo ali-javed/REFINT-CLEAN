@@ -1,5 +1,6 @@
 import { getSupabaseServiceClient } from '@/utils/supabase/client';
 import ReferencesList from '@/components/ReferencesList';
+import ValidateButton from '@/components/ValidateButton';
 
 type ReferencesPageProps = {
   params: Promise<{ documentId?: string }>;
@@ -176,6 +177,13 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
         {/* References List */}
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
           <h2 className="text-xl font-semibold mb-4">References Analysis</h2>
+          
+          {/* Validate Button */}
+          <ValidateButton 
+            documentId={documentId} 
+            hasValidation={refs.some(r => r.existence_score !== null || r.context_integrity_score !== null)} 
+          />
+          
           {refs.length === 0 ? (
             <p className="text-sm text-zinc-400">
               No references found for this document.
