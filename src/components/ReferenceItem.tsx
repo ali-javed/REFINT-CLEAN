@@ -119,18 +119,25 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
     }
   };
 
+  // Split multiple contexts (separated by |)
+  const contexts = reference.context_before ? reference.context_before.split(' | ') : [];
+
   return (
     <li className="border border-slate-200 rounded-lg px-5 py-4 text-sm bg-white shadow-sm hover:shadow-md transition-shadow">
       {/* Main citation display with context */}
       <div className="mb-3">
         {/* Context with inline citation */}
-        {reference.context_before ? (
-          <p className="text-base text-slate-700 leading-relaxed mb-3">
-            {reference.context_before}{' '}
-            <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded text-sm">
-              {getCitationFormat()}
-            </span>
-          </p>
+        {contexts.length > 0 ? (
+          <div className="space-y-3 mb-3">
+            {contexts.map((context, idx) => (
+              <p key={idx} className="text-base text-slate-700 leading-relaxed">
+                {context}{' '}
+                <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded text-sm">
+                  {getCitationFormat()}
+                </span>
+              </p>
+            ))}
+          </div>
         ) : (
           <p className="text-sm text-slate-500 italic mb-3">
             No context found in document for this reference.
@@ -142,6 +149,11 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
           <p className="text-sm text-slate-900 leading-relaxed">
             {reference.raw_reference}
           </p>
+          {contexts.length > 1 && (
+            <p className="text-xs text-slate-500 mt-2">
+              Cited {contexts.length} times in this document
+            </p>
+          )}
         </div>
       </div>
 

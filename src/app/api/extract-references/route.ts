@@ -408,38 +408,66 @@ export async function POST(req: NextRequest) {
         .eq('id', document.id);
       
       // Extract context for each bibliography entry (2 sentences before citation)
+      // Handle multiple citations like [35, 2, 5] and find ALL occurrences
       referencesWithContext = parsedDoc.bibliography.map((bibEntry, index) => {
-        // Find where this entry is cited in the body text
-        let contextBefore = null;
+        const contexts: string[] = [];
         
-        // Try to find the first in-text citation that references this entry
-        const citationMapping = parsedDoc.citationToBibMapping;
-        const citation = parsedDoc.inTextCitations.find(c => 
-          citationMapping.get(c.citationId) === bibEntry.entryId
-        );
+        // For IEEE style, search for all occurrences of [N] in body text
+        // Also handle ranges like [3-5] and lists like [35, 2, 5]
+        const refNumber = bibEntry.entryId;
         
-        if (citation) {
-          // Find the citation position in body text
-          const citationIndex = parsedDoc.bodyText.indexOf(citation.rawText);
-          if (citationIndex > 0) {
-            // Extract 2 sentences before the citation
-            const textBeforeCitation = parsedDoc.bodyText.substring(0, citationIndex);
-            const sentences = textBeforeCitation.split(/[.!?]+\s+/);
-            const last2Sentences = sentences.slice(-2).join('. ');
-            contextBefore = last2Sentences.trim();
+        // Create regex patterns to find this reference number
+        const patterns = [
+          new RegExp(`\\[${refNumber}\\]`, 'g'), // [35]
+          new RegExp(`\\[\\d+,\\s*${refNumber}(?:\\s*,|\\])`, 'g'), // [1, 35] or [1, 35, 5]
+          new RegExp(`\\[${refNumber}\\s*,`, 'g'), // [35, 2]
+          new RegExp(`\\[\\d+\\s*-\\s*${refNumber}\\]`, 'g'), // [33-35]
+          new RegExp(`\\[${refNumber}\\s*-\\s*\\d+\\]`, 'g'), // [35-40]
+        ];
+        
+        const bodyText = parsedDoc.bodyText;
+        const foundPositions: number[] = [];
+        
+        // Find all positions where this reference is cited
+        for (const pattern of patterns) {
+          let match;
+          pattern.lastIndex = 0; // Reset regex
+          while ((match = pattern.exec(bodyText)) !== null) {
+            foundPositions.push(match.index);
           }
         }
+        
+        // Remove duplicates and sort
+        const uniquePositions = [...new Set(foundPositions)].sort((a, b) => a - b);
+        
+        // Extract context for each occurrence
+        for (const citationIndex of uniquePositions) {
+          if (citationIndex > 0) {
+            // Extract 2 sentences before the citation
+            const textBeforeCitation = bodyText.substring(0, citationIndex);
+            const sentences = textBeforeCitation.split(/[.!?]+\s+/);
+            const last2Sentences = sentences.slice(-2).join('. ').trim();
+            
+            if (last2Sentences && !contexts.includes(last2Sentences)) {
+              contexts.push(last2Sentences);
+            }
+          }
+        }
+        
+        // Join multiple contexts with separator
+        const contextBefore = contexts.length > 0 ? contexts.join(' | ') : null;
         
         return {
           raw_reference: bibEntry.rawText,
           context_before: contextBefore,
-          context_after: null, // Not needed for initial display
+          context_after: null,
           // Parsed metadata
           title: bibEntry.title,
           authors: bibEntry.authors,
           year: bibEntry.year,
           journal: bibEntry.journal,
           entryId: bibEntry.entryId,
+          citation_count: contexts.length, // How many times this reference is cited
         };
       });
       
