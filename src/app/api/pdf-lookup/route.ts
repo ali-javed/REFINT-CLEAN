@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findMatchingPdf, extractPdfSummary } from '@/utils/pdf-repo';
 import { analyzeReferenceIntegrity } from '@/utils/integrity-analyzer';
-import { searchArxiv } from '@/utils/arxiv';
+import { searchArxivFromReference } from '@/utils/arxiv';
 import fs from 'fs';
 import path from 'path';
 
@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
       const papersPath = path.join(process.cwd(), 'public', 'papers', matchingPdfFileName);
       fileExists = fs.existsSync(papersPath);
     } else {
-      // Fallback to arXiv search
-      const arxivResult = await searchArxiv(reference);
+      // Fallback to arXiv search using a smarter query derived from the reference
+      const arxivResult = await searchArxivFromReference(reference);
       if (arxivResult) {
         source = 'arxiv';
         summary = arxivResult.summary || null;

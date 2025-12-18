@@ -63,6 +63,48 @@ export async function searchArxiv(query: string): Promise<ArxivResult | null> {
   };
 }
 
+/**
+ * Attempt to extract a likely paper title from a raw reference string.
+ * This improves arXiv search quality compared to sending the whole citation.
+ */
+function extractLikelyTitle(reference: string): string {
+  const ref = reference.trim();
+
+  // 1) Try quoted title: "Some Paper Title"
+  const quoted = ref.match(/"([^"]{10,})"/);
+  if (quoted) return quoted[1];
+
+  // 2) Try string after year pattern "(2020)" or "2020."
+  const yearMatch = ref.match(/\((\d{4})\)|\b(19|20)\d{2}[.,]/);
+  if (yearMatch && yearMatch.index !== undefined) {
+    const after = ref.slice(yearMatch.index + yearMatch[0].length).trim();
+
+    // Heuristic: cut at first period that looks like end of title
+    const firstDot = after.indexOf('.');
+    if (firstDot > 20) {
+      return after.slice(0, firstDot).trim();
+    }
+
+    if (after.length > 20) {
+      return after;
+    }
+  }
+
+  // 3) Fallback: truncate full reference
+  return ref.slice(0, 200);
+}
+
+/**
+ * Convenience helper: search arXiv using a full citation string by extracting
+ * a likely title and delegating to the generic searchArxiv function.
+ */
+export async function searchArxivFromReference(
+  reference: string
+): Promise<ArxivResult | null> {
+  const titleQuery = extractLikelyTitle(reference);
+  return searchArxiv(titleQuery);
+}
+
 function stripTags(str: string): string {
   return str.replace(/<[^>]+>/g, '');
 }

@@ -1,7 +1,6 @@
 // src/app/api/extract-references/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { extractText } from 'unpdf';
-import { getSupabaseClient } from '@/utils/supabase/server';
 import { getSupabaseServiceClient } from '@/utils/supabase/client';
 import { 
   createDocument, 
@@ -9,6 +8,8 @@ import {
   updateDocumentStatus, 
   calculateDocumentIntegrityScore
 } from '@/utils/database/operations';
+import { searchArxivFromReference } from '@/utils/arxiv';
+import { analyzeReferenceIntegrity } from '@/utils/integrity-analyzer';
 
 interface ReferenceWithContext {
   raw_reference: string;
@@ -410,7 +411,55 @@ export async function POST(req: NextRequest) {
     
     console.log(`[extract-references] Created ${documentReferences.length} document references`);
 
-    // 4) Process references with AI - Two-step review process
+    // 4) Enrich references with arXiv metadata and additional integrity check
+    console.log('[extract-references] Starting arXiv enrichment for references...');
+    try {
+      for (const docRef of documentReferences) {
+        try {
+          if (!docRef.raw_citation_text || docRef.raw_citation_text.length < 20) continue;
+
+          const arxivResult = await searchArxivFromReference(docRef.raw_citation_text);
+          if (!arxivResult) continue;
+
+          const context = `${docRef.context_before || ''} [CITATION: ${
+            docRef.raw_citation_text
+          }] ${docRef.context_after || ''}`.trim();
+
+          const integrity = await analyzeReferenceIntegrity(
+            docRef.raw_citation_text,
+            context || docRef.raw_citation_text,
+            arxivResult.summary || ''
+          );
+
+          const { error: updateError } = await (supabase as any)
+            .from('document_references')
+            .update({
+              arxiv_id: arxivResult.id ?? null,
+              arxiv_title: arxivResult.title ?? null,
+              arxiv_link: arxivResult.link ?? null,
+              arxiv_pdf_url: arxivResult.pdfUrl ?? null,
+              arxiv_published_at: arxivResult.published ?? null,
+              // Store an additional integrity perspective based on the full arXiv abstract
+              arxiv_integrity_score: integrity.score,
+              arxiv_integrity_review: integrity.justification,
+            })
+            .eq('id', docRef.id);
+
+          if (updateError) {
+            console.error(
+              `[extract-references] Failed to update arXiv/enriched integrity for ref ${docRef.id}:`,
+              updateError
+            );
+          }
+        } catch (refErr) {
+          console.error('[extract-references] Error enriching reference via arXiv:', refErr);
+        }
+      }
+    } catch (arxivErr) {
+      console.error('[extract-references] ArXiv enrichment step failed:', arxivErr);
+    }
+
+    // 5) Process references with AI - Two-step review process
     console.log('[extract-references] Starting two-step AI review of references...');
     const aiStartTime = Date.now();
     
@@ -567,7 +616,7 @@ Respond with a JSON object: {"score": <number 0-100>, "comments": "<2-3 sentence
     const aiDuration = Date.now() - aiStartTime;
     console.log(`[extract-references] Two-step AI review took ${aiDuration}ms`);
 
-    // 5) Generate overall AI review summary
+    // 6) Generate overall AI review summary
     console.log('[extract-references] Generating overall AI review summary...');
     let overallAiReview = null;
     
@@ -647,11 +696,11 @@ Response format: Plain text summary (no JSON, no special formatting).`;
       console.error('[extract-references] Error generating overall AI review:', summaryError);
     }
 
-    // 6) Calculate overall document integrity score
+    // 7) Calculate overall document integrity score
     const overallScore = await calculateDocumentIntegrityScore(document.id);
     console.log(`[extract-references] Overall document integrity score: ${overallScore}`);
 
-    // 7) Update document status to completed with AI review
+    // 8) Update document status to completed with AI review
     await updateDocumentStatus(document.id, 'completed', overallScore || undefined, overallAiReview);
 
     console.log(`[extract-references] Successfully processed document ${document.id}`);
