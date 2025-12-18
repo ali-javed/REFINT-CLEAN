@@ -168,8 +168,8 @@ export default function ReferencesList({
   }
 
   return (
-    <ul className="space-y-4">
-      {sortedReferences.map((r) => (
+    <ul className="space-y-5 list-none">
+      {sortedReferences.map((r, index) => (
         <ReferenceItem key={r.id} reference={r} metadata={r.metadata} isSignedIn={!!session} />
       ))}
     </ul>

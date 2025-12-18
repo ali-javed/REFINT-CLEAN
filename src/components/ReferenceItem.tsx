@@ -81,54 +81,45 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
     }
   }, [reference]);
 
+  // Extract citation format from raw reference
+  const getCitationFormat = () => {
+    // Check for numbered format like [1], [2]
+    const numberedMatch = reference.raw_reference.match(/^\[(\d+)\]/);
+    if (numberedMatch) return `[${numberedMatch[1]}]`;
+    
+    // Check for author-year format
+    if (reference.first_author && reference.year) {
+      const lastName = reference.first_author.split(' ').pop();
+      return `(${lastName}, ${reference.year})`;
+    }
+    
+    return '[ref]';
+  };
+
   return (
-    <li className="border border-slate-200 rounded-lg px-4 py-3 text-sm bg-white shadow-sm">
-      {/* Context Section - Show first */}
-      {(reference.context_before || reference.context_after) && (
-        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
-          <p className="text-xs font-semibold text-blue-700 mb-2">📝 Context in Document:</p>
-          <p className="text-sm text-slate-800 leading-relaxed">
-            {reference.context_before && (
-              <span className="text-slate-600">{reference.context_before}</span>
-            )}
-            <span className="mx-2 px-2 py-0.5 bg-yellow-200 font-semibold text-slate-900 rounded">
-              [Citation]
+    <li className="border border-slate-200 rounded-lg px-5 py-4 text-sm bg-white shadow-sm hover:shadow-md transition-shadow">
+      {/* Main citation display with context */}
+      <div className="mb-3">
+        {/* Context with inline citation */}
+        {reference.context_before ? (
+          <p className="text-base text-slate-700 leading-relaxed mb-3">
+            {reference.context_before}{' '}
+            <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 font-semibold rounded text-sm">
+              {getCitationFormat()}
             </span>
-            {reference.context_after && (
-              <span className="text-slate-600">{reference.context_after}</span>
-            )}
+          </p>
+        ) : (
+          <p className="text-sm text-slate-500 italic mb-3">
+            No context found in document for this reference.
+          </p>
+        )}
+        
+        {/* Full reference */}
+        <div className="pl-4 border-l-2 border-slate-300">
+          <p className="text-sm text-slate-900 leading-relaxed">
+            {reference.raw_reference}
           </p>
         </div>
-      )}
-
-      {/* Parsed Metadata Section */}
-      {(reference.first_author || reference.year || reference.publication) && (
-        <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
-          <p className="text-xs font-semibold text-slate-600 mb-2">📚 Reference Details:</p>
-          {reference.first_author && (
-            <p className="text-sm text-slate-800 mb-1">
-              <span className="font-semibold">Authors:</span> {reference.first_author}
-              {reference.second_author && `, ${reference.second_author}`}
-              {reference.last_author && reference.last_author !== reference.first_author && reference.last_author !== reference.second_author && `, ... ${reference.last_author}`}
-            </p>
-          )}
-          {reference.year && (
-            <p className="text-sm text-slate-800 mb-1">
-              <span className="font-semibold">Year:</span> {reference.year}
-            </p>
-          )}
-          {reference.publication && (
-            <p className="text-sm text-slate-800">
-              <span className="font-semibold">Publication:</span> {reference.publication}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Reference Citation */}
-      <div className="mb-3">
-        <p className="text-xs font-semibold text-slate-600 mb-1">Full Reference Citation:</p>
-        <p className="text-sm text-slate-900 font-medium">{reference.raw_reference}</p>
       </div>
 
       {/* Existence Check Section */}

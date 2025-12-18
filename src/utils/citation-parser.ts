@@ -39,6 +39,12 @@ export interface ParsedCitation {
   pages?: string;
 }
 
+export interface ParsedAuthor {
+  firstName: string | null;
+  lastName: string;
+  fullName: string;
+}
+
 export interface BibliographyEntry {
   // Entry metadata
   entryId: string; // numeric label or author-year key
@@ -446,6 +452,13 @@ function parseIEEEBibliography(text: string): BibliographyEntry[] {
   let currentEntry: { id: string; text: string } | null = null;
   
   for (const line of lines) {
+    const trimmed = line.trim();
+    
+    // Skip empty lines or standalone page numbers
+    if (!trimmed || /^\d{1,3}$/.test(trimmed)) {
+      continue;
+    }
+    
     const match = line.match(/^\s*\[(\d+)\]\s+(.+)/);
     
     if (match) {
@@ -456,9 +469,12 @@ function parseIEEEBibliography(text: string): BibliographyEntry[] {
       
       // Start new entry
       currentEntry = { id: match[1], text: match[2] };
-    } else if (currentEntry && line.trim()) {
-      // Continuation line
-      currentEntry.text += ' ' + line.trim();
+    } else if (currentEntry && trimmed) {
+      // Continuation line - only add if it looks like reference content
+      // Skip if it's just a page number or figure caption
+      if (!/^(Figure|Table|Equation|\d+$)/.test(trimmed)) {
+        currentEntry.text += ' ' + trimmed;
+      }
     }
   }
   
@@ -471,51 +487,133 @@ function parseIEEEBibliography(text: string): BibliographyEntry[] {
 }
 
 function parseIEEEEntry(id: string, text: string): BibliographyEntry {
-  // Extract authors (before first quoted title or before "in")
-  let authors: string[] = [];
-  const authorsMatch = text.match(/^(.+?)(?:,\s*")/);
-  if (authorsMatch) {
-    authors = authorsMatch[1].split(/,\s+and\s+|,\s+/).map(a => a.trim());
+  // Extract authors (before first period followed by title)
+  let authors: ParsedAuthor[] = [];
+  
+  // Try to find author section (before title with period)
+  const authorSectionMatch = text.match(/^(.+?)\.\s+[A-Z]/);
+  if (authorSectionMatch) {
+    const authorsText = authorSectionMatch[1];
+    
+    // Split by "and" or commas
+    const authorNames = authorsText.split(/\s+and\s+|,\s*(?=[A-Z])/);
+    
+    for (let authorName of authorNames) {
+      authorName = authorName.trim();
+      
+      // Handle concatenated names like "MitchellPMarcus"
+      // Split on capital letters followed by lowercase (camelCase boundaries)
+      if (/^[A-Z][a-z]+[A-Z]/.test(authorName) && !authorName.includes(' ')) {
+        // Split on capital letter boundaries
+        authorName = authorName.replace(/([a-z])([A-Z])/g, '$1 $2');
+      }
+      
+      // Parse individual author name
+      const parsed = parseAuthorName(authorName);
+      if (parsed) {
+        authors.push(parsed);
+      }
+    }
   }
   
-  // Extract title (in quotes)
-  const titleMatch = text.match(/"([^"]+)"/);
-  const title = titleMatch ? titleMatch[1] : null;
+  // Extract title (usually after authors and before year/journal)
+  let title: string | null = null;
+  // Try to extract title after first period
+  const titleMatch = text.match(/^[^.]+\.\s+(.+?)\.\s+(?:[A-Z][a-z]+|CoRR|arXiv|In\s)/);
+  if (titleMatch) {
+    title = titleMatch[1].trim();
+  }
   
   // Extract year
   const yearMatch = text.match(/\b(19|20)\d{2}\b/);
   const year = yearMatch ? parseInt(yearMatch[0]) : null;
   
   // Extract journal/venue
-  const journalMatch = text.match(/",\s*([^,]+),\s*vol\./);
-  const journal = journalMatch ? journalMatch[1].trim() : null;
+  let journal: string | null = null;
+  if (text.includes('CoRR')) {
+    journal = 'CoRR';
+  } else if (text.includes('arXiv preprint')) {
+    journal = 'arXiv preprint';
+  } else {
+    // Look for journal after title
+    const journalMatch = text.match(/\.\s+([A-Z][^,]+),\s*(?:\d+|vol\.)/);
+    if (journalMatch) {
+      journal = journalMatch[1].trim();
+    }
+  }
   
   // Extract volume
-  const volMatch = text.match(/vol\.\s*(\d+)/);
+  const volMatch = text.match(/(?:vol\.\s*)?(\d+)\((\d+)\)/);
   const volume = volMatch ? volMatch[1] : null;
+  const issue = volMatch ? volMatch[2] : null;
   
   // Extract pages
-  const pagesMatch = text.match(/pp\.\s*([\d\-–]+)/);
-  const pages = pagesMatch ? pagesMatch[1] : null;
+  const pagesMatch = text.match(/(?:pages?\s*|pp\.\s*|:)([\d]+)[-–]([\d]+)/);
+  const pages = pagesMatch ? `${pagesMatch[1]}–${pagesMatch[2]}` : null;
   
   // Extract DOI
   const doiMatch = text.match(/(?:doi:\s*|https?:\/\/doi\.org\/)?(10\.\d+\/\S+)/i);
   const doi = doiMatch ? doiMatch[1] : null;
   
+  // Convert ParsedAuthor[] to string[]
+  const authorStrings = authors.map(a => 
+    `${a.firstName || ''} ${a.lastName}`.trim()
+  );
+  
   return {
     entryId: id,
     rawText: text,
-    authors,
+    authors: authorStrings,
     title,
     year,
     journal,
     volume,
-    issue: null,
+    issue,
     pages,
     doi,
     url: null,
     publisher: null,
     confidence: 0.8,
+  };
+}
+
+function parseAuthorName(name: string): ParsedAuthor | null {
+  if (!name || name.length === 0) return null;
+  
+  name = name.trim();
+  
+  // Handle "Last, First Middle" format
+  if (name.includes(',')) {
+    const parts = name.split(',').map(p => p.trim());
+    const lastName = parts[0];
+    const firstParts = parts[1] ? parts[1].split(/\s+/) : [];
+    const firstName = firstParts[0] || '';
+    
+    return {
+      firstName,
+      lastName,
+      fullName: `${firstName} ${lastName}`.trim(),
+    };
+  }
+  
+  // Handle "First Middle Last" format
+  const parts = name.split(/\s+/);
+  if (parts.length >= 2) {
+    const lastName = parts[parts.length - 1];
+    const firstName = parts.slice(0, -1).join(' ');
+    
+    return {
+      firstName,
+      lastName,
+      fullName: name,
+    };
+  }
+  
+  // Single name (likely last name only)
+  return {
+    firstName: null,
+    lastName: name,
+    fullName: name,
   };
 }
 

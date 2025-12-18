@@ -456,15 +456,15 @@ export async function POST(req: NextRequest) {
     const documentReferences = await createDocumentReferences(
       document.id,
       referencesWithContext.map((ref, index) => {
-        // Extract author names from parsed bibliography
+        // Extract author names from parsed bibliography (now string[])
         const firstAuthor = ref.authors.length > 0 
-          ? `${ref.authors[0].firstName || ''} ${ref.authors[0].lastName || ''}`.trim() 
+          ? ref.authors[0] 
           : undefined;
         const secondAuthor = ref.authors.length > 1 
-          ? `${ref.authors[1].firstName || ''} ${ref.authors[1].lastName || ''}`.trim() 
+          ? ref.authors[1] 
           : undefined;
         const lastAuthor = ref.authors.length > 2 
-          ? `${ref.authors[ref.authors.length - 1].firstName || ''} ${ref.authors[ref.authors.length - 1].lastName || ''}`.trim() 
+          ? ref.authors[ref.authors.length - 1] 
           : undefined;
         
         return {
