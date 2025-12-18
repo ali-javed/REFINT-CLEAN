@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       throw new Error('OpenAI API key not configured');
     }
     
-    for (const docRef of references) {
+    for (const docRef of (references as any[])) {
       try {
         // STEP 1: Existence Check
         const existencePrompt = `Analyze this academic reference and rate its existence/completeness on a scale of 0-100. Consider factors like:

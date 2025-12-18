@@ -10,6 +10,7 @@ import {
   calculateDocumentIntegrityScore
 } from '@/utils/database/operations';
 import { parseReference } from '@/utils/reference-parser';
+import { parseAcademicDocument } from '@/utils/citation-parser';
 
 interface ReferenceWithContext {
   raw_reference: string;
@@ -369,19 +370,72 @@ export async function POST(req: NextRequest) {
     
     console.log(`[extract-references] Created document record: ${document.id}`);
 
-    // 2) Extract references with context from the PDF
+    // 2) Extract and parse references with context from the PDF
     console.log(`[extract-references] Extracting references from ${file.name}...`);
     const startTime = Date.now();
     
-    let referencesWithContext;
-    let totalParsedCount;
+    let referencesWithContext: any[];
+    let totalParsedCount: number;
+    let fullText: string = '';
+    
     try {
       // Update status to processing
       await updateDocumentStatus(document.id, 'processing');
       
-      const result = await extractReferencesFromPdf(buffer, file.name);
-      referencesWithContext = result.references;
-      totalParsedCount = result.totalParsed;
+      // Extract full text from PDF
+      const uint8Array = new Uint8Array(buffer);
+      const result = await extractText(uint8Array);
+      fullText = Array.isArray(result?.text) ? result.text.join('\n') : (typeof result === 'string' ? result : '');
+      
+      if (!fullText.trim()) {
+        throw new Error('PDF text is empty or could not be parsed');
+      }
+      
+      // Use comprehensive citation parser
+      const parsedDoc = parseAcademicDocument(fullText);
+      
+      console.log(`[extract-references] Detected citation style: ${parsedDoc.style} (${(parsedDoc.styleConfidence * 100).toFixed(0)}% confidence)`);
+      console.log(`[extract-references] Found ${parsedDoc.bibliography.length} bibliography entries`);
+      console.log(`[extract-references] Found ${parsedDoc.inTextCitations.length} in-text citations`);
+      
+      // Extract context for each bibliography entry (2 sentences before citation)
+      referencesWithContext = parsedDoc.bibliography.map((bibEntry, index) => {
+        // Find where this entry is cited in the body text
+        let contextBefore = null;
+        
+        // Try to find the first in-text citation that references this entry
+        const citationMapping = parsedDoc.citationToBibMapping;
+        const citation = parsedDoc.inTextCitations.find(c => 
+          citationMapping.get(c.citationId) === bibEntry.entryId
+        );
+        
+        if (citation) {
+          // Find the citation position in body text
+          const citationIndex = parsedDoc.bodyText.indexOf(citation.rawText);
+          if (citationIndex > 0) {
+            // Extract 2 sentences before the citation
+            const textBeforeCitation = parsedDoc.bodyText.substring(0, citationIndex);
+            const sentences = textBeforeCitation.split(/[.!?]+\s+/);
+            const last2Sentences = sentences.slice(-2).join('. ');
+            contextBefore = last2Sentences.trim();
+          }
+        }
+        
+        return {
+          raw_reference: bibEntry.rawText,
+          context_before: contextBefore,
+          context_after: null, // Not needed for initial display
+          // Parsed metadata
+          title: bibEntry.title,
+          authors: bibEntry.authors,
+          year: bibEntry.year,
+          journal: bibEntry.journal,
+          entryId: bibEntry.entryId,
+        };
+      });
+      
+      totalParsedCount = parsedDoc.bibliography.length;
+      
     } catch (pdfError) {
       console.error('[extract-references] PDF extraction failed:', pdfError);
       await updateDocumentStatus(document.id, 'failed');
@@ -398,24 +452,32 @@ export async function POST(req: NextRequest) {
       .update({ total_references: totalParsedCount })
       .eq('id', document.id);
 
-    // 3) Parse and save document references to database with structured data
+    // 3) Save document references to database with parsed metadata
     const documentReferences = await createDocumentReferences(
       document.id,
       referencesWithContext.map((ref, index) => {
-        // Parse reference to extract structured data
-        const parsed = parseReference(ref.raw_reference);
+        // Extract author names from parsed bibliography
+        const firstAuthor = ref.authors.length > 0 
+          ? `${ref.authors[0].firstName || ''} ${ref.authors[0].lastName || ''}`.trim() 
+          : undefined;
+        const secondAuthor = ref.authors.length > 1 
+          ? `${ref.authors[1].firstName || ''} ${ref.authors[1].lastName || ''}`.trim() 
+          : undefined;
+        const lastAuthor = ref.authors.length > 2 
+          ? `${ref.authors[ref.authors.length - 1].firstName || ''} ${ref.authors[ref.authors.length - 1].lastName || ''}`.trim() 
+          : undefined;
         
         return {
           rawCitationText: ref.raw_reference,
           contextBefore: ref.context_before || undefined,
           contextAfter: ref.context_after || undefined,
           positionInDoc: index,
-          // Add parsed structured data
-          firstAuthor: parsed.authors[0]?.firstName || undefined,
-          secondAuthor: parsed.authors[0]?.lastName || undefined,
-          lastAuthor: parsed.authors[parsed.authors.length - 1]?.lastName || undefined,
-          year: parsed.year || undefined,
-          publication: parsed.journal || undefined,
+          // Parsed metadata from citation parser
+          firstAuthor,
+          secondAuthor,
+          lastAuthor,
+          year: ref.year || undefined,
+          publication: ref.journal || undefined,
         };
       })
     );
@@ -433,261 +495,7 @@ export async function POST(req: NextRequest) {
       referencesProcessed: referencesWithContext.length,
       status: 'ready_for_review',
     }, { status: 200 });
-
-    /* AI VALIDATION IS NOW MANUAL - USER CLICKS "VALIDATE REFERENCES" BUTTON
-    // 4) Process references with AI - Two-step review process
-    console.log('[extract-references] Starting two-step AI review of references...');
-    const aiStartTime = Date.now();
-    
-    try {
-      const openaiApiKey = process.env.OPENAI_API_KEY;
-      if (!openaiApiKey) {
-        console.warn('[extract-references] OpenAI API key not configured, skipping AI review');
-      } else {
-        const supabase = getSupabaseServiceClient();
-        
-        for (const docRef of documentReferences) {
-          try {
-            // STEP 1: Existence Check - Does the reference exist and is it properly formatted?
-            const existencePrompt = `Analyze this academic reference and rate its existence/completeness on a scale of 0-100. Consider factors like:
-- Does it have author names?
-- Does it have a title?
-- Does it have a year?
-- Does it look properly formatted?
-- Is it complete and parseable?
-
-Reference: ${docRef.raw_citation_text}
-
-Respond with a JSON object: {"score": <number 0-100>, "explanation": "<brief explanation>"}`;
-            
-            const existenceResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openaiApiKey}`,
-              },
-              body: JSON.stringify({
-                model: 'gpt-3.5-turbo',
-                messages: [
-                  { role: 'system', content: 'You are an academic reference validation assistant.' },
-                  { role: 'user', content: existencePrompt },
-                ],
-                temperature: 0.3,
-              }),
-            });
-            
-            let existenceScore = null;
-            let existenceCheck = null;
-            
-            if (existenceResponse.ok) {
-              const data = await existenceResponse.json();
-              let content = data.choices?.[0]?.message?.content;
-              
-              if (content) {
-                try {
-                  // Remove code block markers if present
-                  content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
-                  const result = JSON.parse(content);
-                  existenceScore = Math.max(0, Math.min(100, result.score || 50));
-                  existenceCheck = result.explanation || 'Existence check completed';
-                  console.log(`[extract-references] Existence check for ${docRef.id}: ${existenceScore}/100`);
-                } catch (parseError) {
-                  console.error('[extract-references] Failed to parse existence check response:', parseError);
-                }
-              }
-            }
-            
-            // STEP 2: Context Integrity Check - Does the paper support how it's being referenced?
-            let contextIntegrityScore = null;
-            let contextIntegrityReview = null;
-            
-            if (docRef.context_before || docRef.context_after) {
-              const context = `${docRef.context_before || ''} [CITATION: ${docRef.raw_citation_text}] ${docRef.context_after || ''}`;
-              
-              console.log(`[extract-references] Performing context integrity check for ${docRef.id}`);
-              
-              const contextPrompt = `You are an academic paper reviewer. Analyze how this paper is being referenced in context.
-
-Context: ${context}
-
-Reference Citation: ${docRef.raw_citation_text}
-
-Note: The full PDF content is not available yet. Based on the citation and context alone:
-1. Give 2-3 brief comments on whether the authors appear to be referencing the paper appropriately
-2. Assess if the citation seems relevant to the context in which it's used
-3. Rate the alignment between the context and what this type of reference would typically support
-
-Return an integrity score (0-100) for how well the reference appears to support its usage context.
-
-Respond with a JSON object: {"score": <number 0-100>, "comments": "<2-3 sentences>"}`;
-              
-              const contextResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${openaiApiKey}`,
-                },
-                body: JSON.stringify({
-                  model: 'gpt-4o-mini',
-                  messages: [
-                    { role: 'system', content: 'You are an academic paper reviewer specializing in citation integrity.' },
-                    { role: 'user', content: contextPrompt },
-                  ],
-                  temperature: 0.4,
-                }),
-              });
-              
-              if (contextResponse.ok) {
-                const data = await contextResponse.json();
-                let content = data.choices?.[0]?.message?.content;
-                
-                if (content) {
-                  try {
-                    // Remove code block markers if present
-                    content = content.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
-                    const result = JSON.parse(content);
-                    contextIntegrityScore = Math.max(0, Math.min(100, result.score || 50));
-                    contextIntegrityReview = result.comments || 'Context integrity check completed';
-                    console.log(`[extract-references] Context integrity for ${docRef.id}: ${contextIntegrityScore}/100`);
-                  } catch (parseError) {
-                    console.error('[extract-references] Failed to parse context integrity response:', parseError);
-                    console.error('[extract-references] Raw response:', content);
-                  }
-                }
-              } else {
-                const errorText = await contextResponse.text();
-                console.error(`[extract-references] Context integrity API error for ${docRef.id}:`, contextResponse.status, errorText);
-              }
-            } else {
-              console.log(`[extract-references] Skipping context integrity check for ${docRef.id} - no context available`);
-              console.log(`[extract-references] Context before: ${docRef.context_before ? 'YES' : 'NO'}, Context after: ${docRef.context_after ? 'YES' : 'NO'}`);
-            }
-            
-            // Update the reference with both AI scores
-            const { error: updateError } = await (supabase as any)
-              .from('document_references')
-              .update({
-                existence_score: existenceScore,
-                existence_check: existenceCheck,
-                context_integrity_score: contextIntegrityScore,
-                context_integrity_review: contextIntegrityReview,
-                // Keep old fields for backward compatibility
-                integrity_score: contextIntegrityScore || existenceScore,
-                ai_review: contextIntegrityReview || existenceCheck,
-              })
-              .eq('id', docRef.id);
-            
-            if (updateError) {
-              console.error(`[extract-references] Failed to update reference ${docRef.id}:`, updateError);
-            }
-          } catch (aiError) {
-            console.error(`[extract-references] AI review failed for reference ${docRef.id}:`, aiError);
-          }
-        }
-      }
-    } catch (aiError) {
-      console.error('[extract-references] AI review process failed:', aiError);
-    }
-    
-    const aiDuration = Date.now() - aiStartTime;
-    console.log(`[extract-references] Two-step AI review took ${aiDuration}ms`);
-
-    // 5) Generate overall AI review summary
-    console.log('[extract-references] Generating overall AI review summary...');
-    let overallAiReview = null;
-    
-    try {
-      const openaiApiKey = process.env.OPENAI_API_KEY;
-      if (openaiApiKey) {
-        const supabase = getSupabaseServiceClient();
-        
-        // Fetch all AI reviews for this document
-        const { data: allReviews, error: fetchError } = await supabase
-          .from('document_references')
-          .select('raw_citation_text, existence_score, existence_check, context_integrity_score, context_integrity_review')
-          .eq('document_id', document.id);
-        
-        if (!fetchError && allReviews && allReviews.length > 0) {
-          // Build a summary of all individual reviews
-          const reviewsSummary = allReviews
-            .map((ref: any, idx: number) => {
-              let summary = `\n${idx + 1}. ${ref.raw_citation_text}\n`;
-              
-              if (ref.existence_score !== null) {
-                summary += `   Existence Score: ${ref.existence_score}/100\n`;
-                if (ref.existence_check) {
-                  summary += `   Existence Check: ${ref.existence_check}\n`;
-                }
-              }
-              
-              if (ref.context_integrity_score !== null) {
-                summary += `   Context Integrity Score: ${ref.context_integrity_score}/100\n`;
-                if (ref.context_integrity_review) {
-                  summary += `   Context Integrity Review: ${ref.context_integrity_review}\n`;
-                }
-              }
-              
-              return summary;
-            })
-            .join('\n');
-          
-          const summaryPrompt = `You are an academic journal reviewer. Below are the individual reference integrity reviews for a research document. Each reference has been analyzed for existence/formatting and context integrity.
-
-${reviewsSummary}
-
-Based on these individual reviews, provide a concise overall summary (2-3 paragraphs) of the reference integrity for this document. Address:
-1. Overall quality of references (formatting, completeness)
-2. How well references support their usage context
-3. Any patterns or concerns across the reference list
-4. Final recommendation
-
-Response format: Plain text summary (no JSON, no special formatting).`;
-
-          const summaryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${openaiApiKey}`,
-            },
-            body: JSON.stringify({
-              model: 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: 'You are an academic journal reviewer providing concise, professional assessments of reference integrity.' },
-                { role: 'user', content: summaryPrompt },
-              ],
-              temperature: 0.5,
-            }),
-          });
-          
-          if (summaryResponse.ok) {
-            const data = await summaryResponse.json();
-            overallAiReview = data.choices?.[0]?.message?.content?.trim() || null;
-            console.log(`[extract-references] Generated overall AI review (${overallAiReview?.length || 0} chars)`);
-          } else {
-            console.error('[extract-references] Failed to generate overall AI review:', summaryResponse.status);
-          }
-        }
-      }
-    } catch (summaryError) {
-      console.error('[extract-references] Error generating overall AI review:', summaryError);
-    }
-
-    // 6) Calculate overall document integrity score
-    const overallScore = await calculateDocumentIntegrityScore(document.id);
-    console.log(`[extract-references] Overall document integrity score: ${overallScore}`);
-
-    // 7) Update document status to completed with AI review
-    await updateDocumentStatus(document.id, 'completed', overallScore || undefined, overallAiReview);
-
-    console.log(`[extract-references] Successfully processed document ${document.id}`);
-    
-    return NextResponse.json({
-      documentId: document.id,
-      referencesCount: referencesWithContext.length,
-      overallScore,
-    }, { status: 200 });
-    END OF COMMENTED AI VALIDATION SECTION */
-    
+  
   } catch (err) {
     console.error('[extract-references] Error:', err);
     

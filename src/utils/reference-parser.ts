@@ -120,7 +120,7 @@ function detectReferenceFormat(text: string): { type: ParsedReference['detectedF
     },
   ];
   
-  let bestMatch = { type: 'Unknown' as const, confidence: 50 };
+  let bestMatch: { type: ParsedReference['detectedFormat'], confidence: number } = { type: 'Unknown', confidence: 50 };
   
   for (const pattern of patterns) {
     if (pattern.regex.test(text)) {

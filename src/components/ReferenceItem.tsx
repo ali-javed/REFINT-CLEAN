@@ -26,6 +26,11 @@ interface ReferenceItemProps {
   reference: {
     id: string;
     raw_reference: string;
+    first_author?: string | null;
+    second_author?: string | null;
+    last_author?: string | null;
+    year?: number | null;
+    publication?: string | null;
     context_before?: string | null;
     context_after?: string | null;
     existence_score?: number | null;
@@ -87,7 +92,7 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
               <span className="text-slate-600">{reference.context_before}</span>
             )}
             <span className="mx-2 px-2 py-0.5 bg-yellow-200 font-semibold text-slate-900 rounded">
-              {reference.raw_reference}
+              [Citation]
             </span>
             {reference.context_after && (
               <span className="text-slate-600">{reference.context_after}</span>
@@ -96,9 +101,33 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
         </div>
       )}
 
+      {/* Parsed Metadata Section */}
+      {(reference.first_author || reference.year || reference.publication) && (
+        <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+          <p className="text-xs font-semibold text-slate-600 mb-2">📚 Reference Details:</p>
+          {reference.first_author && (
+            <p className="text-sm text-slate-800 mb-1">
+              <span className="font-semibold">Authors:</span> {reference.first_author}
+              {reference.second_author && `, ${reference.second_author}`}
+              {reference.last_author && reference.last_author !== reference.first_author && reference.last_author !== reference.second_author && `, ... ${reference.last_author}`}
+            </p>
+          )}
+          {reference.year && (
+            <p className="text-sm text-slate-800 mb-1">
+              <span className="font-semibold">Year:</span> {reference.year}
+            </p>
+          )}
+          {reference.publication && (
+            <p className="text-sm text-slate-800">
+              <span className="font-semibold">Publication:</span> {reference.publication}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Reference Citation */}
       <div className="mb-3">
-        <p className="text-xs font-semibold text-slate-600 mb-1">Reference Citation:</p>
+        <p className="text-xs font-semibold text-slate-600 mb-1">Full Reference Citation:</p>
         <p className="text-sm text-slate-900 font-medium">{reference.raw_reference}</p>
       </div>
 
