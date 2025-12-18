@@ -398,6 +398,12 @@ export async function POST(req: NextRequest) {
       console.log(`[extract-references] Found ${parsedDoc.bibliography.length} bibliography entries`);
       console.log(`[extract-references] Found ${parsedDoc.inTextCitations.length} in-text citations`);
       
+      // Save citation style to document
+      await (supabase as any)
+        .from('documents')
+        .update({ citation_style: parsedDoc.style })
+        .eq('id', document.id);
+      
       // Extract context for each bibliography entry (2 sentences before citation)
       referencesWithContext = parsedDoc.bibliography.map((bibEntry, index) => {
         // Find where this entry is cited in the body text

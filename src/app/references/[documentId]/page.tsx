@@ -61,6 +61,9 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
 
   const document = documents[0];
 
+  // Get citation style from document
+  const citationStyle = (document as any).citation_style || 'IEEE';
+  
   // Then get the document references
   const { data, error } = await supabase
     .from('document_references')
@@ -189,7 +192,7 @@ export default async function ReferencesPage(props: ReferencesPageProps) {
               No references found for this document.
             </p>
           ) : (
-            <ReferencesList references={refs} />
+            <ReferencesList references={refs} citationStyle={citationStyle} />
           )}
         </div>
       </div>

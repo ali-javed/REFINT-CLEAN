@@ -41,6 +41,8 @@ interface ReferenceItemProps {
   metadata?: PdfMetadata | null;
   loading?: boolean;
   isSignedIn?: boolean;
+  citationStyle?: string;
+  referenceIndex?: number;
 }
 
 /**
@@ -65,7 +67,7 @@ function getScoreIcon(score: number): string {
   return '✗';
 }
 
-export default function ReferenceItem({ reference, metadata, loading, isSignedIn }: ReferenceItemProps) {
+export default function ReferenceItem({ reference, metadata, loading, isSignedIn, citationStyle = 'IEEE', referenceIndex = 1 }: ReferenceItemProps) {
   const pdfMetadata: PdfMetadata | null = useMemo(() => metadata ?? null, [metadata]);
   const isLoading = loading ?? !metadata;
 
@@ -81,19 +83,40 @@ export default function ReferenceItem({ reference, metadata, loading, isSignedIn
     }
   }, [reference]);
 
-  // Extract citation format from raw reference
+  // Format citation based on document's citation style
   const getCitationFormat = () => {
-    // Check for numbered format like [1], [2]
-    const numberedMatch = reference.raw_reference.match(/^\[(\d+)\]/);
-    if (numberedMatch) return `[${numberedMatch[1]}]`;
-    
-    // Check for author-year format
-    if (reference.first_author && reference.year) {
-      const lastName = reference.first_author.split(' ').pop();
-      return `(${lastName}, ${reference.year})`;
+    switch (citationStyle) {
+      case 'IEEE':
+      case 'Vancouver':
+      case 'Nature':
+        // Numbered format: [1], [2], etc.
+        return `[${referenceIndex}]`;
+      
+      case 'APA':
+      case 'Harvard':
+      case 'Chicago-AuthorDate':
+        // Author-year format: (Smith, 2020)
+        if (reference.first_author && reference.year) {
+          const lastName = reference.first_author.split(' ').pop();
+          return `(${lastName}, ${reference.year})`;
+        }
+        return `(Author, Year)`;
+      
+      case 'MLA':
+        // Author page format: (Smith 45)
+        if (reference.first_author) {
+          const lastName = reference.first_author.split(' ').pop();
+          return `(${lastName})`;
+        }
+        return `(Author)`;
+      
+      case 'Chicago-Notes':
+        // Superscript number
+        return `${referenceIndex}`;
+      
+      default:
+        return `[${referenceIndex}]`;
     }
-    
-    return '[ref]';
   };
 
   return (

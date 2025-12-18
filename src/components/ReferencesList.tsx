@@ -48,8 +48,10 @@ interface ReferenceWithMetadata extends Reference {
 
 export default function ReferencesList({
   references,
+  citationStyle = 'IEEE',
 }: {
   references: Reference[];
+  citationStyle?: string;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => {
@@ -170,7 +172,14 @@ export default function ReferencesList({
   return (
     <ul className="space-y-5 list-none">
       {sortedReferences.map((r, index) => (
-        <ReferenceItem key={r.id} reference={r} metadata={r.metadata} isSignedIn={!!session} />
+        <ReferenceItem 
+          key={r.id} 
+          reference={r} 
+          metadata={r.metadata} 
+          isSignedIn={!!session}
+          citationStyle={citationStyle}
+          referenceIndex={index + 1}
+        />
       ))}
     </ul>
   );
