@@ -192,6 +192,11 @@ function detectBibliographySection(text: string): { bodyText: string; references
  * Step 3: Detect citation style
  */
 function detectCitationStyle(bodyText: string, referencesText: string): { style: CitationStyle; confidence: number } {
+  // First check if references section starts with [1], [2], etc. - very strong IEEE indicator
+  if (referencesText.match(/^\s*\[1\]/)) {
+    return { style: 'IEEE', confidence: 0.95 };
+  }
+  
   const patterns = {
     IEEE: /\[\d+\]/g,
     Vancouver: /\(\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+)*\)/g,
@@ -478,6 +483,8 @@ function parseIEEEBibliography(text: string): BibliographyEntry[] {
     });
   }
   
+  console.log(`[parseIEEEBibliography] Found ${matches.length} numbered references in text`);
+  
   // Extract text between each [N] and the next [N+1]
   for (let i = 0; i < matches.length; i++) {
     const current = matches[i];
@@ -501,6 +508,8 @@ function parseIEEEBibliography(text: string): BibliographyEntry[] {
       entries.push(parseIEEEEntry(current.id, entryText));
     }
   }
+  
+  console.log(`[parseIEEEBibliography] Parsed ${entries.length} entries`);
   
   return entries;
 }
