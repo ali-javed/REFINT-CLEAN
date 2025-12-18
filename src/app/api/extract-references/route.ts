@@ -378,6 +378,9 @@ export async function POST(req: NextRequest) {
     let totalParsedCount: number;
     let fullText: string = '';
     
+    // Initialize Supabase client at the start
+    const supabase = getSupabaseServiceClient();
+    
     try {
       // Update status to processing
       await updateDocumentStatus(document.id, 'processing');
@@ -452,7 +455,6 @@ export async function POST(req: NextRequest) {
     console.log(`[extract-references] Extraction took ${duration}ms for ${referencesWithContext.length} references`);
 
     // Save total references count to document (full parsed count, not limited)
-    const supabase = getSupabaseServiceClient();
     await (supabase as any)
       .from('documents')
       .update({ total_references: totalParsedCount })

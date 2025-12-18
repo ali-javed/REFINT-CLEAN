@@ -155,9 +155,27 @@ function detectBibliographySection(text: string): { bodyText: string; references
     const match = regex.exec(text);
     if (match) {
       const splitIndex = match.index + match[0].length;
+      let referencesText = text.substring(splitIndex);
+      
+      // Stop at common non-reference sections (figures, tables, appendices)
+      const stopPatterns = [
+        /\n\s*(?:Figure|Table|Equation)\s+\d+/i,
+        /\n\s*(?:Appendix|Supplementary|Additional)/i,
+        /\n\s*Attention\s+Visualizations/i,
+        /\n\s*(?:A\.|APPENDIX)\s+[A-Z]/,
+      ];
+      
+      for (const stopPattern of stopPatterns) {
+        const stopMatch = stopPattern.exec(referencesText);
+        if (stopMatch) {
+          referencesText = referencesText.substring(0, stopMatch.index);
+          break;
+        }
+      }
+      
       return {
         bodyText: text.substring(0, match.index),
-        referencesText: text.substring(splitIndex),
+        referencesText,
       };
     }
   }
@@ -447,63 +465,63 @@ function parseBibliography(referencesText: string, style: CitationStyle): Biblio
 
 function parseIEEEBibliography(text: string): BibliographyEntry[] {
   const entries: BibliographyEntry[] = [];
-  const lines = text.split('\n');
   
-  let currentEntry: { id: string; text: string } | null = null;
+  // First, try to split on [N] patterns globally
+  const referencePattern = /\[(\d+)\]/g;
+  const matches: Array<{ id: string; start: number }> = [];
   
-  for (const line of lines) {
-    const trimmed = line.trim();
-    
-    // Skip empty lines or standalone page numbers
-    if (!trimmed || /^\d{1,3}$/.test(trimmed)) {
-      continue;
-    }
-    
-    const match = line.match(/^\s*\[(\d+)\]\s+(.+)/);
-    
-    if (match) {
-      // Save previous entry
-      if (currentEntry) {
-        entries.push(parseIEEEEntry(currentEntry.id, currentEntry.text));
-      }
-      
-      // Start new entry
-      currentEntry = { id: match[1], text: match[2] };
-    } else if (currentEntry && trimmed) {
-      // Continuation line - only add if it looks like reference content
-      // Skip if it's just a page number or figure caption
-      if (!/^(Figure|Table|Equation|\d+$)/.test(trimmed)) {
-        currentEntry.text += ' ' + trimmed;
-      }
-    }
+  let match;
+  while ((match = referencePattern.exec(text)) !== null) {
+    matches.push({
+      id: match[1],
+      start: match.index,
+    });
   }
   
-  // Save last entry
-  if (currentEntry) {
-    entries.push(parseIEEEEntry(currentEntry.id, currentEntry.text));
+  // Extract text between each [N] and the next [N+1]
+  for (let i = 0; i < matches.length; i++) {
+    const current = matches[i];
+    const next = matches[i + 1];
+    
+    const startPos = current.start;
+    const endPos = next ? next.start : text.length;
+    
+    let entryText = text.substring(startPos, endPos).trim();
+    
+    // Remove the [N] prefix
+    entryText = entryText.replace(/^\[\d+\]\s*/, '');
+    
+    // Clean up: remove page numbers on their own line
+    entryText = entryText.replace(/\n\s*\d{1,3}\s*\n/g, ' ');
+    
+    // Replace multiple spaces/newlines with single space
+    entryText = entryText.replace(/\s+/g, ' ').trim();
+    
+    if (entryText.length > 10) {
+      entries.push(parseIEEEEntry(current.id, entryText));
+    }
   }
   
   return entries;
 }
 
 function parseIEEEEntry(id: string, text: string): BibliographyEntry {
-  // Extract authors (before first period followed by title)
+  // Extract authors (before first period)
   let authors: ParsedAuthor[] = [];
   
-  // Try to find author section (before title with period)
-  const authorSectionMatch = text.match(/^(.+?)\.\s+[A-Z]/);
-  if (authorSectionMatch) {
-    const authorsText = authorSectionMatch[1];
+  // IEEE format: Author1, Author2, and Author3. Title. Journal, Year.
+  const firstPeriodIndex = text.indexOf('.');
+  if (firstPeriodIndex > 0) {
+    const authorsText = text.substring(0, firstPeriodIndex).trim();
     
-    // Split by "and" or commas
-    const authorNames = authorsText.split(/\s+and\s+|,\s*(?=[A-Z])/);
+    // Split by "and" or ", "
+    const authorNames = authorsText.split(/\s+and\s+|,\s+(?=\w)/);
     
     for (let authorName of authorNames) {
       authorName = authorName.trim();
       
       // Handle concatenated names like "MitchellPMarcus"
-      // Split on capital letters followed by lowercase (camelCase boundaries)
-      if (/^[A-Z][a-z]+[A-Z]/.test(authorName) && !authorName.includes(' ')) {
+      if (/^[A-Z][a-z]+[A-Z]/.test(authorName) && !authorName.includes(' ') && !authorName.includes('.')) {
         // Split on capital letter boundaries
         authorName = authorName.replace(/([a-z])([A-Z])/g, '$1 $2');
       }
@@ -516,12 +534,29 @@ function parseIEEEEntry(id: string, text: string): BibliographyEntry {
     }
   }
   
-  // Extract title (usually after authors and before year/journal)
+  // Extract title (between first and second period, or first and "In/Proc/arXiv")
   let title: string | null = null;
-  // Try to extract title after first period
-  const titleMatch = text.match(/^[^.]+\.\s+(.+?)\.\s+(?:[A-Z][a-z]+|CoRR|arXiv|In\s)/);
-  if (titleMatch) {
-    title = titleMatch[1].trim();
+  const afterAuthors = text.substring(firstPeriodIndex + 1).trim();
+  
+  // Look for title patterns
+  const titleEndPatterns = [
+    /\.\s+(?:In\s+|Proc\.|Proceedings|arXiv|CoRR|Journal|IEEE)/i,
+    /\.\s+[A-Z][a-z]+,\s*\d{4}/,  // . Journal, Year
+    /\.\s+\d{4}\./,  // . Year.
+  ];
+  
+  for (const pattern of titleEndPatterns) {
+    const match = pattern.exec(afterAuthors);
+    if (match) {
+      title = afterAuthors.substring(0, match.index).trim();
+      break;
+    }
+  }
+  
+  // Fallback: if no match, take text until next period
+  if (!title && afterAuthors.includes('.')) {
+    const nextPeriod = afterAuthors.indexOf('.');
+    title = afterAuthors.substring(0, nextPeriod).trim();
   }
   
   // Extract year
@@ -534,21 +569,26 @@ function parseIEEEEntry(id: string, text: string): BibliographyEntry {
     journal = 'CoRR';
   } else if (text.includes('arXiv preprint')) {
     journal = 'arXiv preprint';
+  } else if (text.match(/\b(?:Proceedings|Proc\.)\s+(?:of\s+)?(?:the\s+)?/i)) {
+    const procMatch = text.match(/\b(?:Proceedings|Proc\.)\s+(?:of\s+)?(?:the\s+)?([^,\.]+)/i);
+    if (procMatch) {
+      journal = procMatch[1].trim();
+    }
   } else {
-    // Look for journal after title
-    const journalMatch = text.match(/\.\s+([A-Z][^,]+),\s*(?:\d+|vol\.)/);
+    // Look for pattern: . Journal Name, Year or . Journal Name. Year
+    const journalMatch = text.match(/\.\s+([A-Z][^,\.]+?)(?:,\s*(?:vol\.|Volume|\d{4})|\.\s*\d{4})/);
     if (journalMatch) {
       journal = journalMatch[1].trim();
     }
   }
   
-  // Extract volume
-  const volMatch = text.match(/(?:vol\.\s*)?(\d+)\((\d+)\)/);
+  // Extract volume/issue
+  const volMatch = text.match(/(?:vol\.\s*|Volume\s*)?(\d+)\((\d+)\)/i);
   const volume = volMatch ? volMatch[1] : null;
   const issue = volMatch ? volMatch[2] : null;
   
   // Extract pages
-  const pagesMatch = text.match(/(?:pages?\s*|pp\.\s*|:)([\d]+)[-–]([\d]+)/);
+  const pagesMatch = text.match(/(?:pages?\s*|pp\.\s*|:)\s*([\d]+)[-–]([\d]+)/i);
   const pages = pagesMatch ? `${pagesMatch[1]}–${pagesMatch[2]}` : null;
   
   // Extract DOI
